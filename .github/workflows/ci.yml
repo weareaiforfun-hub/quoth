@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Build all targets
+        run: swift build
+      - name: Unit tests
+        run: swift test
+      - name: Release build of the app and MCP server
+        run: |
+          swift build -c release --product Quoth
+          swift build -c release --product quoth-mcp

@@ -1,0 +1,10 @@
+{"id":"edit-shorter","instruction":"make this more concise","selection":"I just wanted to reach out and let you know that I think we should probably consider moving the meeting to next week if that works for everyone involved.","action":"replace","max_words":20}
+{"id":"edit-bullets","instruction":"turn this into bullet points","selection":"We need to update the docs, fix the login bug and email the investors.","action":"replace","must_contain":["\n"]}
+{"id":"edit-translate","instruction":"translate this to Spanish","selection":"Thank you for your help today.","action":"replace","must_contain":["gracias"]}
+{"id":"edit-formal","instruction":"make it more formal","selection":"hey can u send me the file asap thx","action":"replace","must_not_contain":["u send","thx"]}
+{"id":"draft-reply","instruction":"write a reply saying I'll be 10 minutes late","field":"Hi Alex, are we still on for the 3pm call? Best, Tom","action":"insert","must_contain":["10"]}
+{"id":"draft-new","instruction":"draft a short thank you note to Sarah for the birthday gift","action":"insert","must_contain":["Sarah"]}
+{"id":"question-sel","instruction":"what does this mean?","selection":"The API is idempotent.","action":"answer"}
+{"id":"question-general","instruction":"how many days are in a leap year","action":"answer","must_contain":["366"]}
+{"id":"search","instruction":"search the web for the best ramen in Berlin","action":"search","must_contain":["ramen"]}
+{"id":"edit-field","instruction":"fix the grammar of this message","field":"me and him goes to the store yesterday","action":"replace","must_not_contain":["goes"]}
