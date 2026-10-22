@@ -61,8 +61,10 @@ public enum ModelBundle: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Installed RAM in GB (8, 16, 32…).
-    public static var thisMacRAMGB: Int { Int(ProcessInfo.processInfo.physicalMemory >> 30) }
+    /// Installed RAM in GB (8, 16, 32…), rounded: virtual machines report slightly less than they have.
+    public static var thisMacRAMGB: Int { ramGB(bytes: ProcessInfo.processInfo.physicalMemory) }
+
+    static func ramGB(bytes: UInt64) -> Int { Int((Double(bytes) / Double(1 << 30)).rounded()) }
 }
 
 extension Settings {

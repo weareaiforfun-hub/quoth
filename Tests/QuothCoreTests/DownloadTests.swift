@@ -155,7 +155,10 @@ final class EventLog: @unchecked Sendable {
         #expect(ModelBundle.recommended(ramGB: 24) == .standard)
         #expect(ModelBundle.recommended(ramGB: 32) == .best)
         #expect(ModelBundle.recommended(ramGB: 128) == .best)
-        #expect(ModelBundle.thisMacRAMGB >= 8)
+        #expect(ModelBundle.thisMacRAMGB > 0)
+        #expect(ModelBundle.ramGB(bytes: 8 << 30) == 8)
+        #expect(ModelBundle.ramGB(bytes: (8 << 30) - 300_000_000) == 8)   // a VM reporting a bit less
+        #expect(ModelBundle.ramGB(bytes: 64 << 30) == 64)
     }
 
     @Test func bundlesMatchThePlan() {
