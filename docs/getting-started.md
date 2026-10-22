@@ -27,9 +27,9 @@ scripts/setup.sh
 
 `setup.sh` does four things:
 
-1. Installs **whisper.cpp** (the speech engine) and **Ollama** (the language-model engine) with Homebrew.
+1. Installs **cmake** with Homebrew, used to build the two engines (whisper.cpp for speech, llama.cpp for text) that ship inside the app. Nothing else needs to run alongside Quoth.
 2. Downloads the **Whisper Large v3 Turbo** speech model (575 MB).
-3. Downloads a **Qwen 2.5** language model sized to your memory: 14B on 32 GB+ Macs, 7B on 16 GB, 3B below that. Use `CLEANUP_MODEL=qwen2.5:7b-instruct scripts/setup.sh` to choose another.
+3. Downloads a language model sized to your memory and checks its SHA-256: **Qwen 2.5 14B** (9 GB) on 32 GB+ Macs, **Qwen 2.5 7B** (4.7 GB) on 16 GB, **Qwen 3 4B** (2.5 GB) below that. You can switch later in Quoth → Models.
 4. Creates a local code-signing certificate called "Quoth Dev", so macOS remembers the app's permissions every time you rebuild it.
 
 ## 3. Build and open the app
@@ -42,7 +42,7 @@ The first time, macOS asks whether `codesign` may use the "Quoth Dev" key. Click
 
 ## 4. Grant permissions
 
-Quoth opens on the **Setup** page. Grant each permission; the page updates by itself.
+Quoth opens on the **Setup** page. First, under **AI models**, pick a bundle (the one sized to your Mac is marked) and click **Download**; it runs while you do the rest, can be paused, and continues after a restart. (If you ran `setup.sh`, the models are already there.) Then grant each permission; the page updates by itself.
 
 | Permission | Why |
 | --- | --- |
@@ -84,7 +84,7 @@ The [User guide](user-guide.md) covers everything else.
 | Nothing happens when I hold the key | Check Accessibility and Input Monitoring in the Setup page. Rebuilt the app? Click **Always Allow** on the codesign prompt; otherwise permissions reset. |
 | The emoji picker opens | Set "Press 🌐 key to" → Do Nothing, or switch the hotkey to Right Option. |
 | "Speech model: model missing" in the menu | Run `scripts/setup.sh` again, or download a model in Quoth → Models. |
-| Text appears but isn't cleaned up ("cleanup skipped") | Ollama isn't running (`brew services start ollama`), or the model isn't downloaded (Quoth → Models). Very long dictations get more time automatically. |
+| Text appears but isn't cleaned up ("cleanup skipped") | The language model isn't downloaded or is still loading (Quoth → Models shows its status; details in `llama-server.log`). If you chose Ollama, it isn't running (`brew services start ollama`). Very long dictations get more time automatically. |
 | It's slow | Pin your language (Settings), choose a smaller language model (Models → Dictation cleanup), or use a cloud API. |
 | Text goes to the wrong place | Quoth pastes where the cursor is when you **start** speaking. Click into the field first. |
 | "Won't type into password fields" | That's intentional. |

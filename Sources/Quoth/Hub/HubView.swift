@@ -38,7 +38,8 @@ struct HubView: View {
     let controller: DictationController
     @ObservedObject var meetings: MeetingController
     private var section: Binding<HubSection?> {
-        Binding(get: { HubSection(rawValue: state.hubSection ?? "") ?? (Permissions.allGranted ? .features : .setup) },
+        Binding(get: { HubSection(rawValue: state.hubSection ?? "")
+                    ?? (Permissions.allGranted && state.settings.missingLocalModels.isEmpty ? .features : .setup) },
                 set: { state.hubSection = $0?.rawValue })
     }
 
@@ -274,9 +275,10 @@ struct SetupView: View {
     var body: some View {
         Form {
             Section {
-                Text("Quoth needs three permissions (the fourth, for meeting notes, is optional). Grant each, then come back; this page updates by itself.")
+                Text("Two things to set up: the AI models (start the download first; it runs while you do the rest) and three permissions (the fourth, for meeting notes, is optional). This page updates by itself.")
                     .foregroundStyle(.secondary)
             }
+            ModelSetupSection(state: state)
             Section("Permissions") {
                 row("Microphone", "To hear you while you hold the hotkey.", granted: micStatus == .authorized) {
                     if micStatus == .notDetermined {
@@ -303,7 +305,8 @@ struct SetupView: View {
             Section("Engines") {
                 LabeledContent("Speech model", value: state.settings.speechProvider == .local
                                ? "\(ModelCatalog.speechInfo(forPath: state.settings.whisperModelPath)?.name ?? "Whisper"): \(state.whisperStatus)" : "Cloud")
-                LabeledContent("Cleanup model", value: state.settings.textProvider == .local ? state.settings.ollamaModel : state.settings.cloudLLMModel)
+                LabeledContent("Language model", value: state.settings.textProvider == .local && state.settings.localTextEngine == .builtIn
+                               ? "\(state.settings.textModelName): \(state.textEngineStatus)" : state.settings.textModelName)
             }
             Section("Try it") {
                 Text("Click into any text field, hold \(state.settings.hotkey.title), say “um so let's meet at two actually three”, and release.")

@@ -1,6 +1,6 @@
 # Architecture
 
-Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift dependencies. It's built with Swift Package Manager; Xcode isn't required. AI runs in two local servers that Quoth talks to over HTTP on `127.0.0.1`, or in a cloud API.
+Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift dependencies. It's built with Swift Package Manager; Xcode isn't required. AI runs in two local servers that ship inside Quoth.app and that Quoth talks to over HTTP on `127.0.0.1`, or in a cloud API. Ollama can replace the built-in language-model server.
 
 ```
 ┌──────────────────────── Quoth.app ────────────────────────┐
@@ -11,8 +11,9 @@ Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift depende
 │              QuothCore.DictationPipeline                  │
 │                │                    │                        │
 │                ▼                    ▼                        │
-│   whisper-server (whisper.cpp)   Ollama /api/chat            │
+│   whisper-server (whisper.cpp)   llama-server (llama.cpp)    │
 │   speech → raw text              raw text → cleaned text     │
+│                                  (or Ollama /api/chat)       │
 │                │                    │                        │
 │                └──── deterministic rules ────┘               │
 │                             ▼                                │
@@ -36,7 +37,7 @@ Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift depende
 | Folder | Contents |
 | --- | --- |
 | `ASR/` | `Transcriber` protocol; `WhisperServerTranscriber` (local) and `OpenAITranscriber` (cloud); WAV encoding and streaming writer |
-| `Cleanup/` | `LLMClient`/`Cleaner` protocols; `OllamaCleaner` (native `/api/chat`, keeps the model loaded) and `ChatCompletionsCleaner` (OpenAI-compatible); `CleanupPrompt` (system prompt + examples, `ListDetector`) |
+| `Cleanup/` | `LLMClient`/`Cleaner` protocols; `OllamaCleaner` (native `/api/chat`, keeps the model loaded) and `ChatCompletionsCleaner` (OpenAI-compatible: the built-in llama-server via `LlamaServer`, and cloud APIs); `CleanupPrompt` (system prompt + examples, `ListDetector`) |
 | `Pipeline/` | `DictationPipeline`: audio → text → final string, plus `Continuation`, `Greeting`, `LanguageRules` |
 | `PostProcess/` | Spoken punctuation, output sanitiser, whisper hallucination filter |
 | `Personal/` | Dictionary/snippets/styles/transforms data (`PersonalData`), `TextRules` (replacements, snippets), `StyleRules`, `AutoLearn`, `DevFormatting` |
@@ -44,7 +45,7 @@ Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift depende
 | `Notes/` | Scratchpad `NotesStore` with versions |
 | `Meetings/` | Meeting store, voice-activity segmentation, transcript merge, summaries, cross-meeting search |
 | `History/` | SQLite `HistoryStore` (system libsqlite3) and `Insights` |
-| `Models/` | `ModelCatalog`, `ModelDownloader`, Ollama pull, `ModelBench` scoring |
+| `Models/` | `ModelCatalog` (Whisper and GGUF files with size + SHA-256, Ollama tags), `ModelBundle` (Lite/Standard/Best by memory), `ResumableDownloader` (Range resume, retries, SHA-256 check), Ollama pull, `ModelBench` scoring |
 | `MCP/` | `MCPServer` (JSON-RPC 2.0) |
 | `Settings/` | `Settings` (tolerant JSON decoding with migrations), paths, Keychain |
 
@@ -61,7 +62,7 @@ Quoth is a native Swift app (AppKit + SwiftUI) with no third-party Swift depende
 7. **Dictionary replacements** before the LLM, so the model sees the right spelling.
 8. **Snippet triggers** are replaced by `[[S1]]` placeholders so the model can't paraphrase them.
 9. **LLM cleanup** with a length-scaled timeout (base + 0.08 s/word locally).
-   - *Prompt layout:* a static system prompt + few-shot examples (identical for every dictation, so Ollama reuses its prompt cache), then a per-dictation `<notes>` block (LIST, app, email, tone, variant, vocabulary, text before the cursor) and the `<transcript>`.
+   - *Prompt layout:* a static system prompt + few-shot examples (identical for every dictation, so llama-server and Ollama reuse their prompt cache), then a per-dictation `<notes>` block (LIST, app, email, tone, variant, vocabulary, text before the cursor) and the `<transcript>`.
    - *Output checks:* sanitise; repair list numbering; restore a dropped list lead-in; reject output that looks like an answer (much longer than the input); join greetings outside email; flatten lists nobody dictated.
    - *Any failure* → deterministic spoken-punctuation fallback.
 10. **Dictionary replacements** again, then identifiers.
@@ -82,7 +83,8 @@ Design rule: anything a small model does unreliably (lists, greetings, periods, 
 | Earshot pill | Non-activating `NSPanel` at status-bar level, so it never steals focus |
 | Context | `AXFocusedUIElement` (system-wide, then per app). Electron/Chromium apps get `AXManualAccessibility`/`AXEnhancedUserInterface` switched on so their text fields are visible. Value, selection and window title are read; secure fields and password managers are skipped |
 | Insertion | Snapshot the pasteboard → write text (marked transient) → synthetic ⌘V → restore after 0.5–5 s per app (`AppOverrides`). Only a password field blocks pasting; if Accessibility can't see the field, it pastes anyway |
-| whisper-server | `WhisperServerProcess` launches and keeps it warm (Metal), restarts it if it dies, reuses an existing one |
+| Engines | `EngineProcess` launches `whisper-server` (port 8178) and `llama-server` (port 8179, one slot, 16k context, `--alias` = the GGUF file name) from `Contents/MacOS`, warms them up (Metal), restarts them if they die (gives up after three failed starts), stops them on quit or SIGTERM, and kills a server orphaned by a force-quit Quoth (pid files) |
+| Downloads | `DownloadCenter` queues model downloads app-wide (progress survives closing the Hub), and remembers a bundle chosen on the Setup page so it resumes after a restart |
 | Meetings | `SystemAudioRecorder` (ScreenCaptureKit audio only) + a second disk-only `AudioRecorder`. After the call: per-track voice-activity regions → per-region transcription (accurate timestamps) → echo-aware merge → map-reduce summary |
 | Hub (the Quoth window) | SwiftUI `NavigationSplitView` with tabs: Features, History, Insights, Meetings, Dictionary, Snippets, Style, Transforms, Models, Settings, Setup |
 | Debug hooks | `DistributedNotificationCenter` hooks for automated testing, enabled only by a defaults flag (see [Development](development.md)) |
@@ -99,8 +101,9 @@ Design rule: anything a small model does unreliably (lists, greetings, periods, 
 | `audio/*.wav` | Dictation audio (retention per Settings) |
 | `notes/` | `index.json`, `<id>.rtf`, `<id>.txt`, `versions/` |
 | `meetings/<id>/` | `meta.json`, `me.wav`, `others.wav`, `transcript.json`, `summary.md` |
-| `models/` | Whisper model files |
+| `models/` | Whisper (`.bin`) and language model (`.gguf`) files |
 | `app-overrides.json` | Optional per-app paste overrides |
-| `whisper-server.log` | Speech server log |
+| `whisper-server.log`, `llama-server.log` | Engine logs (rewritten at each start) |
+| `whisper-server.pid`, `llama-server.pid` | The running engines, so a later launch can stop orphans |
 
 The cloud API key lives in the login Keychain (service `app.quoth`).

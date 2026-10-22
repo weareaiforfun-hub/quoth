@@ -1,6 +1,6 @@
 # Distribution: making Quoth a one-click download
 
-*Assessment and plan, October 2026. Not implemented yet.*
+*Assessment and plan, October 2026. Steps 1 (bundled engines) and 2 (first-run model download) are implemented.*
 
 **Decision:** Quoth ships as a **free** Mac download, without the paid Apple Developer Program. Releases are signed with the project's own certificate and published on GitHub Releases. Users approve the app once in System Settings ("Open Anyway"). Apple notarization stays an optional upgrade if the one-time approval turns out to put people off.
 
@@ -32,17 +32,19 @@ What currently forces the extra installs:
 
 ## Models: download on first run
 
-Shipping 9 GB of weights in a DMG isn't practical. Instead:
+Shipping 9 GB of weights in a DMG isn't practical. Instead, the Setup page (which opens on first launch, and whenever a chosen model is missing):
 
-1. On first launch, an onboarding screen detects memory and recommends a bundle:
-   - *Lite:* Whisper Small + Qwen 2.5 3B, ~2.5 GB, for 8 GB Macs.
-   - *Standard:* Whisper Large v3 Turbo + Qwen 2.5 7B, ~5.3 GB, for 16 GB.
-   - *Best:* Turbo + Qwen 2.5 14B, ~9.6 GB, for 32 GB+.
-2. Downloads with a progress bar, resumable, from Hugging Face (GGUF builds for llama-server). `ModelDownloader` and the Models tab already do this for Whisper.
-3. Checks SHA-256 hashes from a small signed manifest.
-4. The app is usable with a cloud key while downloading.
+1. Detects memory and recommends a bundle (`ModelBundle`):
+   - *Lite:* Whisper Small + Qwen 3 4B Instruct 2507, 3.0 GB, for 8 GB Macs.
+   - *Standard:* Whisper Large v3 Turbo + Qwen 2.5 7B, 5.3 GB, for 16 GB.
+   - *Best:* Turbo + Qwen 2.5 14B, 9.6 GB, for 32 GB+.
+2. Downloads from Hugging Face with a progress bar, speed and time left (`ResumableDownloader` + `DownloadCenter`): one file at a time, HTTP Range resume after dropped connections, pause/resume, and an interrupted bundle continues by itself at the next launch.
+3. Checks each file's size and SHA-256 (from the catalog in the app, which is itself signed) before it is used; a damaged file is deleted.
+4. Checks free disk space first, then points both jobs at the bundle and starts the engines.
 
-Licences allow this: Whisper is MIT; Qwen 2.5 7B/14B are Apache-2.0; llama.cpp and whisper.cpp are MIT. The Qwen 2.5 3B licence is non-commercial (fine for a free open-source app, but check before any paid version); Qwen 3 4B (Apache-2.0) is the alternative.
+Measured with `quoth-eval --builtin` (66 cleanup cases / 10 commands, M1 Max): Best 62/66 same words, 0 serious, ~0.7 s; Standard 61/66, 1 serious (answered a question), 9/10 commands, ~0.35 s; Lite 58/66, 0 serious, 10/10 commands, ~0.25 s.
+
+Licences allow this: Whisper is MIT; Qwen 2.5 7B/14B and Qwen 3 4B are Apache-2.0; llama.cpp and whisper.cpp are MIT.
 
 ## Signing and installation (free route)
 

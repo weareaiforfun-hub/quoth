@@ -29,7 +29,7 @@ Quoth is an independent open-source project and isn't affiliated with any commer
 ## Requirements
 
 - A Mac with **Apple Silicon** (M1 or later) and **macOS 14 Sonoma** or later
-- **Memory:** 16 GB works (7B model); 32 GB+ recommended for the default 14B model. 8 GB Macs can use the 3B model or a cloud API.
+- **Memory:** 16 GB works (7B model); 32 GB+ recommended for the default 14B model. 8 GB Macs can use the 4B model or a cloud API.
 - **Disk:** about 1 GB for speech, plus 2–9 GB for the language model
 - Homebrew and the Xcode Command Line Tools (`xcode-select --install`); full Xcode is not needed
 
@@ -37,7 +37,7 @@ Quoth is an independent open-source project and isn't affiliated with any commer
 
 ```bash
 git clone https://github.com/weareaiforfun-hub/quoth.git && cd quoth
-scripts/setup.sh              # installs whisper.cpp + Ollama, downloads models sized to your Mac
+scripts/setup.sh              # installs cmake, downloads models sized to your Mac
 scripts/build-app.sh --open   # builds and installs ~/Applications/Quoth.app
 ```
 

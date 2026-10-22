@@ -8,7 +8,15 @@ SUP="$HOME/Library/Application Support/Quoth"
 TMP="$(mktemp -d)"
 PASS=0; FAIL=0
 
-restart() { pkill -x Quoth; sleep 1; open "$HOME/Applications/Quoth.app"; for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:8178/ && break; sleep 1; done; sleep 6; }
+restart() {
+  pkill -x Quoth; sleep 1; open "$HOME/Applications/Quoth.app"
+  for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:8178/ && break; sleep 1; done
+  # With the built-in language model, also wait until llama-server has loaded it.
+  sleep 2; if pgrep -x llama-server >/dev/null; then
+    for i in $(seq 1 120); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8179/health)" = 200 ] && break; sleep 1; done
+  fi
+  sleep 6
+}
 speak() { say ${3:+-v $3} -o "$TMP/$1.wav" --data-format=LEI16@16000 "$2"; }
 check() { # name, wav, initial, expected, [extra args]
   local got; got=$(swift scripts/dev/e2e-target.swift "$TMP/$2.wav" "$3" "${@:5}" 2>/dev/null | python3 -c 'import sys,re; t=sys.stdin.read(); m=re.search(r"FIELD<<(.*)>>", t, re.S); print(m.group(1) if m else "")')

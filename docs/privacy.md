@@ -31,9 +31,9 @@ Delete everything by quitting Quoth and removing that folder.
 
 ## What leaves your Mac
 
-- **Local mode (default):** nothing. whisper.cpp and Ollama run on `127.0.0.1`.
+- **Local mode (default):** nothing. whisper.cpp and llama.cpp (or Ollama, if you chose it) run on `127.0.0.1`.
 - **Cloud mode** (your choice, per job): the audio and/or text for that job goes to the provider you configured, under their terms.
-- **Model downloads** come from Hugging Face and the Ollama library.
+- **Model downloads** come from Hugging Face (and the Ollama library if you use Ollama).
 - **Command Mode web search** opens Perplexity in your browser with your query.
 - **MCP (optional):** apps you connect (e.g. Claude Desktop) can read your meeting notes and Scratchpad notes, never dictations. Turn it off in Settings → AI apps.
 

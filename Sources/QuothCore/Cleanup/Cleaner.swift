@@ -119,6 +119,33 @@ public struct ChatCompletionsCleaner: Cleaner, LLMClient {
     }
 }
 
+/// llama.cpp's `llama-server` on this Mac: OpenAI-compatible, so `ChatCompletionsCleaner` talks to it.
+public enum LlamaServer {
+    public static func baseURL(port: Int) -> URL { URL(string: "http://127.0.0.1:\(port)/v1")! }
+
+    /// The client for the model the server was started with (`--alias` = the GGUF file name).
+    public static func client(port: Int, modelPath: String, session: URLSession = .shared) -> ChatCompletionsCleaner {
+        ChatCompletionsCleaner(baseURL: baseURL(port: port), model: alias(forModelPath: modelPath), apiKey: nil, session: session)
+    }
+
+    public static func alias(forModelPath path: String) -> String { (path as NSString).lastPathComponent }
+
+    /// The alias of the loaded model, once the server has finished loading it (nil while loading or not running).
+    public static func loadedModel(port: Int, session: URLSession = .shared) async -> String? {
+        var req = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/health")!)
+        req.timeoutInterval = 2
+        guard let (_, resp) = try? await session.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        guard let (data, _) = try? await session.data(from: baseURL(port: port).appendingPathComponent("models")) else { return nil }
+        return parseModelsList(data).first
+    }
+
+    /// `/v1/models`: {"data":[{"id":"…"}]}.
+    public static func parseModelsList(_ data: Data) -> [String] {
+        struct List: Decodable { struct M: Decodable { let id: String }; let data: [M] }
+        return (try? JSONDecoder().decode(List.self, from: data))?.data.map(\.id) ?? []
+    }
+}
+
 /// Cleanup output is never much longer than the input; cap generation so a runaway answer is cut short.
 func maxTokens(for raw: String) -> Int {
     let words = raw.split(whereSeparator: \.isWhitespace).count

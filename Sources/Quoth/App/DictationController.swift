@@ -238,6 +238,9 @@ final class DictationController {
     func makeLLM(role: ModelRole = .commands) -> (any LLMClient)? {
         let s = state.settings
         switch s.textProvider {
+        case .local where s.localTextEngine == .builtIn:
+            // One model serves every job, so per-role choices apply to Ollama only.
+            return LlamaServer.client(port: s.llamaPort, modelPath: s.llamaModelPath)
         case .local:
             return OllamaCleaner(baseURL: URL(string: s.ollamaBaseURL) ?? URL(string: "http://127.0.0.1:11434")!,
                                  model: s.ollamaModel(for: role))
