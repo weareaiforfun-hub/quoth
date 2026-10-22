@@ -160,14 +160,14 @@ public struct DictationPipeline: Sendable {
         }
         do {
             var cleaned = try await attempt(context)
-            if !cleaned.isEmpty && OutputSanitizer.looksLikeAnswer(cleaned, raw: raw) {
+            if !cleaned.isEmpty && OutputSanitizer.looksLikeAnswer(cleaned, raw: raw, level: level, variant: context.variant) {
                 // Small models sometimes carry out a dictated request. Code decides that, and asks once more.
                 var strict = context
                 strict.answeredBefore = true
                 cleaned = try await attempt(strict)
             }
             outcome.llmMs = ms(since: t1)
-            if cleaned.isEmpty || OutputSanitizer.looksLikeAnswer(cleaned, raw: raw) {
+            if cleaned.isEmpty || OutputSanitizer.looksLikeAnswer(cleaned, raw: raw, level: level, variant: context.variant) {
                 outcome.usedFallback = true
                 outcome.fallbackReason = cleaned.isEmpty ? "empty cleanup" : "cleanup added content"
                 return fallback

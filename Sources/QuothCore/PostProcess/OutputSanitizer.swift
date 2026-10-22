@@ -28,21 +28,39 @@ public enum OutputSanitizer {
     /// Cleanup only removes or rearranges words, so a much longer output is suspicious,
     /// and so is one made mostly of words the speaker never said: a short answer such as
     /// a joke is no longer than the request, but shares almost none of its words.
-    public static func looksLikeAnswer(_ output: String, raw: String) -> Bool {
+    public static func looksLikeAnswer(_ output: String, raw: String, level: CleanupLevel = .light,
+                                       variant: LanguageVariant = .none) -> Bool {
         let rawWords = wordCount(raw)
         let outWords = wordCount(output)
         if outWords > Int(Double(rawWords) * 1.4) + 6 { return true }
+        // Word overlap means nothing when cleanup is asked to change the script (Devanagari → Latin,
+        // Traditional ↔ Simplified) or did so anyway.
+        if [.hinglish, .zhHans, .zhHant].contains(variant) || dominantScript(raw) != dominantScript(output) { return false }
         let said = tokens(raw)
         let saidSet = Set(said), saidJoined = said.joined()
         // Digits come from spoken numbers; substring matches cover joined words and unspaced scripts.
         let words = tokens(output).filter { !$0.allSatisfy(\.isNumber) }
         guard words.count >= 4 else { return false }
         let unsaid = words.filter { !saidSet.contains($0) && !saidJoined.contains($0) }.count
-        return unsaid * 2 > words.count
+        // Medium may reword, so only output that is almost entirely new counts as an answer.
+        return level == .medium ? unsaid * 4 > words.count * 3 : unsaid * 2 > words.count
     }
 
     static func tokens(_ s: String) -> [String] {
-        s.lowercased().components(separatedBy: CharacterSet.letters.union(.decimalDigits).inverted).filter { !$0.isEmpty }
+        s.lowercased().replacingOccurrences(of: "ß", with: "ss")
+            .components(separatedBy: CharacterSet.letters.union(.decimalDigits).inverted).filter { !$0.isEmpty }
+    }
+
+    static let scripts = ["Latin", "Han", "Devanagari", "Cyrillic", "Arabic", "Hiragana", "Katakana", "Hangul",
+                          "Greek", "Hebrew", "Thai"]
+
+    /// The script most of the letters are written in, or nil when there are none.
+    static func dominantScript(_ s: String) -> String? {
+        let counts = scripts.map { name in
+            (name, s.ranges(of: try! Regex("\\p{Script=\(name)}")).count)
+        }
+        guard let best = counts.max(by: { $0.1 < $1.1 }), best.1 > 0 else { return nil }
+        return best.0
     }
 
     public static func wordCount(_ s: String) -> Int {
