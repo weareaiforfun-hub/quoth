@@ -55,6 +55,7 @@ Then follow **[Getting started](docs/getting-started.md)**: grant three permissi
 | [Development](docs/development.md) | Building, testing, evals |
 | [Status & roadmap](docs/status.md) | What's done, what's next, known limits |
 | [Distribution](docs/distribution.md) | Options for a one-click download |
+| [Releasing](docs/releasing.md) | Signing certificate, building and publishing a release |
 | [Contributing](CONTRIBUTING.md) | How to help |
 
 ## License

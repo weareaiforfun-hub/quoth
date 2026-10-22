@@ -1,6 +1,6 @@
 # Distribution: making Quoth a one-click download
 
-*Assessment and plan, October 2026. Steps 1 (bundled engines) and 2 (first-run model download) are implemented.*
+*Assessment and plan, October 2026. Bundled engines, first-run model download and the release script are implemented; see [Releasing](releasing.md).*
 
 **Decision:** Quoth ships as a **free** Mac download, without the paid Apple Developer Program. Releases are signed with the project's own certificate and published on GitHub Releases. Users approve the app once in System Settings ("Open Anyway"). Apple notarization stays an optional upgrade if the one-time approval turns out to put people off.
 

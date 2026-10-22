@@ -51,7 +51,9 @@ Version 0.2 (October 2026).
 
 ## Roadmap
 
-1. **Free one-download Mac app:** bundle the engines, download models on first run, and publish a DMG on GitHub Releases ([Distribution](distribution.md)).
+1. **Free one-download Mac app** ([Distribution](distribution.md)):
+   - Done: engines bundled, models downloaded on first run, `scripts/release.sh` builds a signed DMG.
+   - Next: test the DMG in a fresh user account, publish on GitHub Releases, Sparkle updates.
 2. **Streaming recognition**, so long dictations finish as fast as short ones.
 3. **Rich-text paste** (HTML) for lists, bold snippets and links.
 4. **More platforms** after a successful Mac release: Windows, Linux, Android (each a separate native client).
@@ -65,6 +67,7 @@ Version 0.2 (October 2026).
 - [ ] Try Thumb Talk: Settings → Mouse button to dictate → pick a side or middle button, then hold it and speak.
 - [ ] Try a real call with meeting notes on.
 - [ ] Look over the Quoth window's tabs (screenshots weren't possible in automated testing).
-- [ ] Create the GitHub repository and push (see the [README](../README.md)).
+- [x] Create the GitHub repository and push.
+- [ ] Back up the "Quoth Dev" signing certificate ([Releasing](releasing.md)).
 - [x] Distribution decided: free Mac download via GitHub Releases, without the paid Apple program ([Distribution](distribution.md)).
 - [ ] Choose the final name and run a trademark search before a public launch.
