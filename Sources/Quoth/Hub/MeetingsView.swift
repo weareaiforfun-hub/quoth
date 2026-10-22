@@ -17,6 +17,7 @@ struct MeetingsView: View {
                 Button(meetings.isRecording ? "Stop notes" : "Start meeting notes") {
                     Task { meetings.isRecording ? await meetings.stop() : await meetings.start() }
                 }
+                .fixedSize()
                 .padding(20)
             }
             HStack {
@@ -32,7 +33,9 @@ struct MeetingsView: View {
                     .padding(.horizontal, 20).padding(.top, 8)
             }
             Divider().padding(.top, 12)
-            HSplitView {
+            // A fixed-width list and a flexible detail: an HSplitView with minimum widths overflowed
+            // the Hub at its default size, pushing the header button and Ask field out of the window.
+            HStack(spacing: 0) {
                 List(meetings.meetings, selection: $selected) { m in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(m.title).lineLimit(1)
@@ -45,8 +48,9 @@ struct MeetingsView: View {
                     }
                     .tag(m.id)
                 }
-                .frame(minWidth: 200, idealWidth: 230)
-                detail.frame(minWidth: 380)
+                .frame(width: 220)
+                Divider()
+                detail.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
