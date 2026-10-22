@@ -109,4 +109,15 @@ import Testing
         let samples = SpeechSample.load(dir: url.deletingLastPathComponent().appendingPathComponent("samples"))
         #expect(samples.count == 3)
     }
+
+    @Test func goldenAnswersAreNotRejected() throws {
+        // Every accepted cleanup in the golden set must pass the answer check, or the pipeline would fall back.
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Evals/cleanup-golden.jsonl")
+        let cases = CleanupCase.load(jsonl: try String(contentsOf: url, encoding: .utf8))
+        for c in cases where c.snippets == nil && c.replacements == nil {
+            for good in c.accepted {
+                #expect(!OutputSanitizer.looksLikeAnswer(good, raw: c.raw), "\(c.id): \(good)")
+            }
+        }
+    }
 }

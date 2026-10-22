@@ -25,11 +25,24 @@ public enum OutputSanitizer {
     }
 
     /// Heuristic for "the model answered or embellished instead of cleaning".
-    /// Cleanup only removes or rearranges words, so a much longer output is suspicious.
+    /// Cleanup only removes or rearranges words, so a much longer output is suspicious,
+    /// and so is one made mostly of words the speaker never said: a short answer such as
+    /// a joke is no longer than the request, but shares almost none of its words.
     public static func looksLikeAnswer(_ output: String, raw: String) -> Bool {
         let rawWords = wordCount(raw)
         let outWords = wordCount(output)
-        return outWords > Int(Double(rawWords) * 1.4) + 6
+        if outWords > Int(Double(rawWords) * 1.4) + 6 { return true }
+        let said = tokens(raw)
+        let saidSet = Set(said), saidJoined = said.joined()
+        // Digits come from spoken numbers; substring matches cover joined words and unspaced scripts.
+        let words = tokens(output).filter { !$0.allSatisfy(\.isNumber) }
+        guard words.count >= 4 else { return false }
+        let unsaid = words.filter { !saidSet.contains($0) && !saidJoined.contains($0) }.count
+        return unsaid * 2 > words.count
+    }
+
+    static func tokens(_ s: String) -> [String] {
+        s.lowercased().components(separatedBy: CharacterSet.letters.union(.decimalDigits).inverted).filter { !$0.isEmpty }
     }
 
     public static func wordCount(_ s: String) -> Int {

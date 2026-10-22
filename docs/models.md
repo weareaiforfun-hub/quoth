@@ -51,8 +51,8 @@ The same comparisons run from the command line: `swift run quoth-eval --model <t
 
 | Model | Same words | Serious errors | Typical time | Notes |
 | --- | --- | --- | --- | --- |
-| Qwen 2.5 14B *(default)* | 61/66 | 0 | ~0.9 s | Best overall |
-| Qwen 2.5 7B | 57/64* | 2* | ~0.45 s | Sometimes answers questions or garbles corrections |
+| Qwen 2.5 14B *(default)* | 62/66 | 0 | ~0.7 s | Best overall |
+| Qwen 2.5 7B | 62/66 | 0 | ~0.35 s | Sometimes answers a dictated request; the pipeline catches it and asks again |
 | Gemma 3 12B | 57/64* | 0* | ~7 s | Accurate but can't reuse the prompt cache, so slow per dictation |
 
 \* Measured on an earlier version of the set (64 sentences). Re-run them yourself in the Model Lab: on the 19-sentence quick set, 14B scored 14 exact and 7B 11 exact, both with 0 serious errors.
