@@ -1,5 +1,9 @@
 #!/bin/bash
 # Builds Quoth.app (no Xcode needed) and installs it to ~/Applications.
+#   scripts/build-app.sh                # build and install
+#   scripts/build-app.sh --open         # …and launch it
+#   scripts/build-app.sh --no-install   # only build/Quoth.app (used by release.sh)
+# QUOTH_VERSION=0.4.0 stamps that version (and the commit count as build number) into the app.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,6 +24,10 @@ cp build/engines/whisper-server build/engines/llama-server "$APP/Contents/MacOS/
 mkdir -p "$APP/Contents/Resources/Licenses"
 cp build/engines/licenses/* build/engines/VERSIONS.txt "$APP/Contents/Resources/Licenses/"
 cp Sources/Quoth/Resources/Info.plist "$APP/Contents/Info.plist"
+if [ -n "${QUOTH_VERSION:-}" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $QUOTH_VERSION" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD)" "$APP/Contents/Info.plist"
+fi
 cp Sources/Quoth/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # Model Lab inputs: test sentences and speech samples.
 cp Evals/cleanup-golden.jsonl "$APP/Contents/Resources/"
@@ -41,6 +49,8 @@ for helper in quoth-mcp whisper-server llama-server; do
 done
 codesign --force --sign "$SIGN" --identifier app.quoth "$APP"
 codesign --verify --strict --deep "$APP"
+
+[ "${1:-}" = "--no-install" ] && exit 0
 
 DEST="$HOME/Applications/Quoth.app"
 mkdir -p "$HOME/Applications"
