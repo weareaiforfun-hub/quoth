@@ -36,7 +36,7 @@ Quoth is an independent open-source project and isn't affiliated with any commer
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/quoth.git && cd quoth
+git clone https://github.com/weareaiforfun-hub/quoth.git && cd quoth
 scripts/setup.sh              # installs whisper.cpp + Ollama, downloads models sized to your Mac
 scripts/build-app.sh --open   # builds and installs ~/Applications/Quoth.app
 ```

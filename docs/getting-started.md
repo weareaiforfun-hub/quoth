@@ -20,7 +20,7 @@ xcode-select --install
 Install [Homebrew](https://brew.sh) if you don't have it, then get Quoth:
 
 ```bash
-git clone https://github.com/<you>/quoth.git
+git clone https://github.com/weareaiforfun-hub/quoth.git
 cd quoth
 scripts/setup.sh
 ```
