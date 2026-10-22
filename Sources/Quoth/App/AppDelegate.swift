@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import SwiftUI
 import QuothCore
 
@@ -40,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         ContextCapture.prepare(NSWorkspace.shared.frontmostApplication)
 
+        Logger(subsystem: "app.quoth", category: "permissions").info(
+            "launch: accessibility=\(Permissions.accessibility) inputMonitoring=\(Permissions.inputMonitoring) microphone=\(Permissions.microphone.rawValue) screen=\(SystemAudioRecorder.hasPermission)")
         if Permissions.allGranted {
             startHotkeys()
         } else {

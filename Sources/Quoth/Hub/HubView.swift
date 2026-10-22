@@ -265,11 +265,16 @@ struct SettingsView: View {
 struct SetupView: View {
     @ObservedObject var state: AppState
     @State private var micStatus = Permissions.microphone
+    // Every permission is tracked as state and re-read each second, so a grant made in
+    // System Settings shows up here without reopening the window.
+    @State private var accessibility = Permissions.accessibility
+    @State private var inputMonitoring = Permissions.inputMonitoring
+    @State private var screenRecording = SystemAudioRecorder.hasPermission
 
     var body: some View {
         Form {
             Section {
-                Text("Quoth needs three permissions. Grant each, then come back; this page updates by itself.")
+                Text("Quoth needs three permissions (the fourth, for meeting notes, is optional). Grant each, then come back; this page updates by itself.")
                     .foregroundStyle(.secondary)
             }
             Section("Permissions") {
@@ -281,16 +286,16 @@ struct SetupView: View {
                     }
                 }
                 row("Accessibility", "To paste text into the focused app and check for password fields.",
-                    granted: Permissions.accessibility) {
+                    granted: accessibility) {
                     Permissions.requestAccessibility()
                     Permissions.openSettings("Privacy_Accessibility")
                 }
-                row("Input Monitoring", "To notice when you hold the hotkey.", granted: Permissions.inputMonitoring) {
+                row("Input Monitoring", "To notice when you hold the hotkey.", granted: inputMonitoring) {
                     Permissions.requestInputMonitoring()
                     Permissions.openSettings("Privacy_ListenEvent")
                 }
                 row("Screen & System Audio Recording (optional)", "Only for meeting notes: records what other participants say. No video is kept.",
-                    granted: SystemAudioRecorder.hasPermission) {
+                    granted: screenRecording) {
                     SystemAudioRecorder.requestPermission()
                     Permissions.openSettings("Privacy_ScreenCapture")
                 }
@@ -309,6 +314,9 @@ struct SetupView: View {
         .formStyle(.grouped)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             micStatus = Permissions.microphone
+            accessibility = Permissions.accessibility
+            inputMonitoring = Permissions.inputMonitoring
+            screenRecording = SystemAudioRecorder.hasPermission
         }
     }
 
