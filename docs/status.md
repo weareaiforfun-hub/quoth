@@ -51,12 +51,13 @@ Version 0.2 (October 2026).
 
 ## Roadmap
 
-1. **One-download app:** bundle the engines and download models on first run ([Distribution](distribution.md)).
+1. **Free one-download Mac app:** bundle the engines, download models on first run, and publish a DMG on GitHub Releases ([Distribution](distribution.md)).
 2. **Streaming recognition**, so long dictations finish as fast as short ones.
 3. **Rich-text paste** (HTML) for lists, bold snippets and links.
-4. **Speaker names** in meetings, from calendar invites and voice profiles.
-5. **Calendar-based meeting detection.**
-6. **Learning from corrections:** use your post-paste edits to tune cleanup (spec 1.3).
+4. **More platforms** after a successful Mac release: Windows, Linux, Android (each a separate native client).
+5. **Speaker names** in meetings, from calendar invites and voice profiles.
+6. **Calendar-based meeting detection.**
+7. **Learning from corrections:** use your post-paste edits to tune cleanup.
 
 ## Still to do (maintainer)
 
@@ -65,5 +66,5 @@ Version 0.2 (October 2026).
 - [ ] Try a real call with meeting notes on.
 - [ ] Look over the Quoth window's tabs (screenshots weren't possible in automated testing).
 - [ ] Create the GitHub repository and push (see the [README](../README.md)).
-- [ ] Decide on distribution: an Apple Developer account for signed, notarised downloads ([Distribution](distribution.md)).
+- [x] Distribution decided: free Mac download via GitHub Releases, without the paid Apple program ([Distribution](distribution.md)).
 - [ ] Choose the final name and run a trademark search before a public launch.

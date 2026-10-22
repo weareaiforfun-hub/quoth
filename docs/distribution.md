@@ -1,6 +1,8 @@
 # Distribution: making Quoth a one-click download
 
-*Assessment, October 2026. Nothing here is implemented yet.*
+*Assessment and plan, October 2026. Not implemented yet.*
+
+**Decision:** Quoth ships as a **free** Mac download, without the paid Apple Developer Program. Releases are signed with the project's own certificate and published on GitHub Releases. Users approve the app once in System Settings ("Open Anyway"). Apple notarization stays an optional upgrade if the one-time approval turns out to put people off.
 
 ## The goal
 
@@ -42,29 +44,35 @@ Shipping 9 GB of weights in a DMG isn't practical. Instead:
 
 Licences allow this: Whisper is MIT; Qwen 2.5 7B/14B are Apache-2.0; llama.cpp and whisper.cpp are MIT. The Qwen 2.5 3B licence is non-commercial (fine for a free open-source app, but check before any paid version); Qwen 3 4B (Apache-2.0) is the alternative.
 
-## Signing and installation
+## Signing and installation (free route)
 
-| Step | Needed for | Cost / owner |
+| Step | Needed for | Cost |
 | --- | --- | --- |
-| Apple Developer Program | A Developer ID certificate, so other Macs trust the app | $99/year, the project owner's account |
-| Developer ID signing of the app and each bundled binary, hardened runtime, microphone entitlement | Gatekeeper | Free once enrolled |
-| Notarisation (`notarytool`) + stapling | No "unidentified developer" warning | Free; automated in CI |
-| DMG (`create-dmg`) with a drag-to-Applications layout | The one-click experience | Free |
-| Sparkle auto-updates (signed appcast on GitHub Releases) | Updates without re-downloading by hand | Free |
-| Homebrew cask (`brew install --cask quoth`) | Developers | Free; a PR to homebrew-cask |
+| Sign every release with the project's own, unchanging certificate | macOS keeps users' permissions (Accessibility, Microphone…) across updates; ad-hoc signing would reset them every time | Free |
+| DMG with a drag-to-Applications layout, on GitHub Releases | The one-download experience | Free |
+| A clear "first launch" guide (README, release notes, download page) | Getting past the one-time Gatekeeper block | Free |
+| Sparkle auto-updates (EdDSA-signed appcast on GitHub) | Updates without re-downloading; Sparkle-installed updates don't trigger the Gatekeeper prompt again | Free |
 
-Without the Developer Program, the alternative is unsigned builds that users must right-click → Open and approve in System Settings. That's fine for early testers, not for a general audience.
+**First launch for users:** macOS blocks apps that Apple hasn't notarised. Since macOS 15, right-click → Open no longer bypasses this, so the steps are:
+1. Double-click Quoth; macOS refuses to open it.
+2. Open System Settings → Privacy & Security, scroll to Security, and click **Open Anyway** (available for about an hour after the attempt). Confirm with your password.
+3. From then on, Quoth opens normally.
 
-**Permissions** still need user approval (Microphone, Accessibility, Input Monitoring), and macOS doesn't allow skipping that. The existing Setup page walks through it; a signed app keeps the grants across updates.
+**Permissions** (Microphone, Accessibility, Input Monitoring) still need approval in any case; the Setup page walks through them.
 
-## Release pipeline (CI)
+**Not available on the free route:** the Mac App Store, Homebrew's official cask repository (it requires notarised apps since Homebrew 5.0), and a warning-free first launch.
 
-GitHub Actions on a macOS runner, on every tag:
+**Optional upgrade:** the Apple Developer Program ($99/year) adds Developer ID signing and notarisation, which removes the "Open Anyway" step. Nothing else in the plan changes.
 
-1. Build (Xcode toolchain) and run unit tests.
-2. Download pinned `whisper-server` and `llama-server` builds (or build them), and sign everything with the Developer ID certificate (stored as an encrypted secret).
-3. Notarise, staple, and build the DMG.
-4. Publish to GitHub Releases, update the Sparkle appcast and the Homebrew cask.
+## Release pipeline
+
+Releases are built locally by the maintainer, so the signing key never leaves their Mac:
+
+1. `scripts/release.sh`: release build, bundle the pinned `whisper-server` and `llama-server` binaries, sign with the project certificate, build the DMG.
+2. `gh release create vX.Y.Z Quoth.dmg` with release notes that include the first-launch steps.
+3. Update the Sparkle appcast.
+
+GitHub Actions keeps building and testing every push, without signing.
 
 ## Other considerations
 
@@ -74,7 +82,9 @@ GitHub Actions on a macOS runner, on every tag:
 
 ## Suggested order
 
-1. Apple Developer account, signing and notarisation in CI, DMG: the app opens anywhere.
-2. Bundle whisper-server + llama-server; first-run model download screen (option A).
-3. Sparkle updates and a Homebrew cask.
-4. Prototype an Apple on-device "Lite" mode (option C) and compare it in the Model Lab.
+1. Bundle `whisper-server` + `llama-server` in the app (option A).
+2. First-run model download on the Setup page, sized to the Mac's memory.
+3. `scripts/release.sh`, DMG on GitHub Releases, README download link + first-launch guide.
+4. Sparkle updates; "Copy diagnostics" / report-a-problem button.
+5. Beta with a few non-technical users.
+6. Later, optionally: Apple notarisation ($99/year), an Apple on-device "Lite" mode (option C), and other platforms (Windows, Linux, Android), each a separate native client sharing Quoth's prompts, evals and model choices.
