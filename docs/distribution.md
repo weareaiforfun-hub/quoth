@@ -42,7 +42,7 @@ Shipping 9 GB of weights in a DMG isn't practical. Instead, the Setup page (whic
 3. Checks each file's size and SHA-256 (from the catalog in the app, which is itself signed) before it is used; a damaged file is deleted.
 4. Checks free disk space first, then points both jobs at the bundle and starts the engines.
 
-Measured with `quoth-eval --builtin` (66 cleanup cases / 10 commands, M1 Max): Best 62/66 same words, 0 serious, ~0.7 s; Standard 61/66, 1 serious (answered a question), 9/10 commands, ~0.35 s; Lite 58/66, 0 serious, 10/10 commands, ~0.25 s.
+Measured with `quoth-eval --builtin` (66 cleanup cases / 10 commands, M1 Max): Best 62/66 same words, 0 serious, ~0.7 s; Standard 61/66, 1 serious (answered a question), 9/10 commands, ~0.35 s; Lite 58/66, 0 serious, 10/10 commands, ~0.25 s. Qwen 3 8B was tried for Standard and scored lower (56/66, 0 serious, 10/10, ~0.4 s); Standard's one serious case is an answered question, which the output checks catch and replace with the plain transcript.
 
 Licences allow this: Whisper is MIT; Qwen 2.5 7B/14B and Qwen 3 4B are Apache-2.0; llama.cpp and whisper.cpp are MIT.
 

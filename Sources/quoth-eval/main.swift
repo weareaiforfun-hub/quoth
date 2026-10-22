@@ -2,6 +2,7 @@
 //
 //   swift run quoth-eval                       # local Ollama, model from settings
 //   swift run quoth-eval --builtin             # the app's built-in llama-server (must be running)
+//   swift run quoth-eval --builtin --port 8190 --gguf model.gguf   # another llama-server you started
 //   swift run quoth-eval --model gemma3:12b
 //   swift run quoth-eval --cloud               # cloud provider from settings + keychain key
 //   swift run quoth-eval --verbose --only no-answer
@@ -34,9 +35,11 @@ if cloud {
     cleaner = ChatCompletionsCleaner(baseURL: URL(string: settings.cloudBaseURL)!, model: model, apiKey: key)
     label = "cloud \(model)"
 } else if builtin {
-    let c = LlamaServer.client(port: settings.llamaPort, modelPath: settings.llamaModelPath)
-    guard await LlamaServer.loadedModel(port: settings.llamaPort) == c.model else {
-        print("llama-server isn't serving \(c.model) on port \(settings.llamaPort): start Quoth with the built-in engine first"); exit(1)
+    // --port/--gguf: a llama-server you started yourself, e.g. to try a model without switching the app.
+    let port = option("--port").flatMap(Int.init) ?? settings.llamaPort
+    let c = LlamaServer.client(port: port, modelPath: option("--gguf") ?? settings.llamaModelPath)
+    guard await LlamaServer.loadedModel(port: port) == c.model else {
+        print("llama-server isn't serving \(c.model) on port \(port): start Quoth with the built-in engine first"); exit(1)
     }
     cleaner = c
     label = "built-in \(c.model)"
