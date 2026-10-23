@@ -1,0 +1,45 @@
+name: Beta feedback
+description: Tried Quoth? Tell us how installing and using it went.
+labels: [beta]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for trying Quoth! Short answers are fine. Please don't paste anything private you dictated.
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did installing go?
+      options:
+        - Smooth
+        - I got stuck, but figured it out
+        - I couldn't get it working
+    validations:
+      required: true
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where did you hesitate or get stuck?
+      description: For example the "Open Anyway" step, the model download, or the permissions.
+  - type: dropdown
+    id: quality
+    attributes:
+      label: How good was the text it typed?
+      options:
+        - Usually right as it was
+        - Needed small fixes
+        - Often wrong
+  - type: textarea
+    id: example
+    attributes:
+      label: An example it got wrong (optional)
+      description: What you said, and what Quoth typed.
+  - type: input
+    id: mac
+    attributes:
+      label: Your Mac
+      description: From Apple menu → About This Mac, for example "MacBook Air M2, 8 GB, macOS 15".
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?
+      description: What you liked, what was confusing, what you'd want next.
