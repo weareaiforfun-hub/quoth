@@ -397,9 +397,12 @@ struct HelpSection: View {
                     copied = true
                     Task { try? await Task.sleep(nanoseconds: 2_000_000_000); copied = false }
                 }
-                Button("Report a Problem…") { DiagnosticsCollector.reportProblem(state: state) }
+                Button("Email the Developer…") { DiagnosticsCollector.emailDeveloper(state: state) }
+                Button("Report on GitHub…") { DiagnosticsCollector.reportProblem(state: state) }
             }
-            Text("Diagnostics list Quoth's version, your Mac model and macOS version, settings, permissions, and recent engine errors. They never include what you dictated, your dictionary or notes, or your user name. Report a Problem copies them and opens a new issue on GitHub (a free GitHub account is needed) for you to fill in.")
+            Text("Questions, ideas or problems: Email the Developer opens a new message to \(Feedback.address) with diagnostics included, for you to read and send. Report on GitHub opens a public issue instead (a free GitHub account is needed).")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Diagnostics list Quoth's version, your Mac model and macOS version, settings, permissions, and recent engine errors. They never include what you dictated, your dictionary or notes, or your user name.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

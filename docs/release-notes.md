@@ -14,7 +14,11 @@ New to this? The **[step-by-step install guide](https://github.com/weareaiforfun
 
 You only do steps 3–4 once; updates open normally. You can check the download against the `.sha256` file: `shasum -a 256 Quoth-*.dmg`.
 
-## What's new
+## What's new in 0.4.1
+
+- **Email the Developer:** in the menu bar menu and Settings → Help. It starts an email with technical details already added (never what you dictated); you read it and press Send. If you use Gmail or another email website, choose **Copy Address and Details**.
+
+## New in 0.4.0
 
 - **One download:** the speech and language engines now ship inside the app. No Homebrew, Terminal or Ollama needed.
 - **First-run setup:**

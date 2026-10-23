@@ -117,7 +117,11 @@ The second time you open Quoth, it asks whether it may check for updates automat
 | My keyboard has no Fn key | Click the Quoth icon in the menu bar → **Open Quoth…** → **Settings**, and choose another key, such as **Right Option**. |
 | The text appears but isn't tidied up | The second model is still downloading or loading. Wait a minute and try again. |
 | The text appears in the wrong place | Quoth types where your cursor was when you **started** speaking. Click into the field first. |
-| Something else | Click the Quoth icon in the menu bar → **Open Quoth…** → **Settings** → **Help** → **Report a Problem…**. This opens a form on GitHub and copies technical details for you to paste in. They never include what you dictated. |
+| Something else | Click the Quoth icon in the menu bar → **Email the Developer…**. It starts an email to the developer with technical details already added (never what you dictated). You read it and press Send. |
+
+## Questions, ideas or problems
+
+Click the Quoth icon in the menu bar and choose **Email the Developer…**, or write to **arian.shafa.analytics@gmail.com**. If you use Gmail or another email website instead of Apple Mail, choose **Copy Address and Details** and paste them into a new email there.
 
 ## Uninstall
 

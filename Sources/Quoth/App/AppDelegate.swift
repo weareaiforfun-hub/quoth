@@ -232,6 +232,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 u.checkForUpdatesInBackground()
             }
         }
+        // "feedback": the mailto link Email the Developer would open → feedback-url.txt
+        center.addObserver(forName: .init("app.quoth.debug.feedback"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let url = Feedback.mailURL(diagnostics: DiagnosticsCollector.report(state: self.state)) else { return }
+                try? url.absoluteString.write(to: AppPaths.support.appendingPathComponent("feedback-url.txt"), atomically: true, encoding: .utf8)
+            }
+        }
+        // "email": the Email the Developer menu item
+        center.addObserver(forName: .init("app.quoth.debug.email"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if let self { DiagnosticsCollector.emailDeveloper(state: self.state) } }
+        }
         // "diagnostics": what Copy Diagnostics would copy → diagnostics.txt
         center.addObserver(forName: .init("app.quoth.debug.diagnostics"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -353,6 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         provider.submenu = psub
         menu.addItem(provider)
         menu.addItem(.separator())
+        menu.addItem(item("Email the Developer…", #selector(emailDeveloperAction)))
         if Updater.shared.isAvailable { menu.addItem(item("Check for Updates…", #selector(checkForUpdatesAction))) }
         menu.addItem(item("Quit Quoth", #selector(quitAction), key: "q"))
     }
@@ -365,6 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openHubAction() { openHub() }
     @objc private func checkForUpdatesAction() { Updater.shared.checkForUpdates() }
+    @objc private func emailDeveloperAction() { DiagnosticsCollector.emailDeveloper(state: state) }
     @objc private func scratchpadAction() { scratchpad.toggle() }
     @objc private func meetingAction() {
         Task { meetings.isRecording ? await meetings.stop() : await meetings.start() }

@@ -52,6 +52,35 @@ enum DiagnosticsCollector {
         if let url = c.url { NSWorkspace.shared.open(url) }
     }
 
+    /// Opens a new email to the developer, with the diagnostics in it. Apple Mail is the default for
+    /// email links even when no account is set up in it (common for people who use Gmail in a browser),
+    /// so with Mail as the default, Quoth asks first and offers to copy the address and details instead.
+    static func emailDeveloper(state: AppState) {
+        let diagnostics = report(state: state)
+        guard let url = Feedback.mailURL(diagnostics: diagnostics) else { return }
+        let handler = NSWorkspace.shared.urlForApplication(toOpen: url)
+        if let handler, handler.lastPathComponent != "Mail.app", NSWorkspace.shared.open(url) { return }
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Email the developer"
+        alert.informativeText = """
+        Write to \(Feedback.address). Quoth adds technical details (never what you dictated), and nothing is sent until you press Send.
+
+        Use Apple Mail, or copy the address and details to write from Gmail or another email service.
+        """
+        alert.addButton(withTitle: handler == nil ? "Copy Address and Details" : "Open in Mail")
+        if handler != nil { alert.addButton(withTitle: "Copy Address and Details") }
+        alert.addButton(withTitle: "Cancel")
+        let choice = alert.runModal()
+        if handler != nil && choice == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(url)
+        } else if choice == (handler == nil ? .alertFirstButtonReturn : .alertSecondButtonReturn) {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("To: \(Feedback.address)\nSubject: \(Feedback.subject)\n\n" + Feedback.body(diagnostics: diagnostics), forType: .string)
+        }
+    }
+
     /// The last 200 KB of a log file.
     private static func tail(_ url: URL) -> String {
         guard let h = try? FileHandle(forReadingFrom: url) else { return "" }
