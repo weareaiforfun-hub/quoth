@@ -2,7 +2,7 @@ Quoth is free, open-source voice dictation for Macs with Apple Silicon (M1 or la
 
 ## Install
 
-1. Download **Quoth-*version*.dmg** below and open it.
+1. Download **Quoth.dmg** below and open it.
 2. Drag **Quoth** onto **Applications**.
 3. Open Quoth from Applications. macOS says it can't check Quoth for malicious software, because Quoth isn't registered with Apple (a $99/year programme this free project doesn't pay for). Click **Done**.
 4. Open **System Settings → Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to "Quoth was blocked". Confirm with your password, then click **Open Anyway** again. (The button appears for about an hour after step 3; if it's gone, repeat step 3.)

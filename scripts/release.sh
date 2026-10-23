@@ -58,6 +58,8 @@ ln -s /Applications "$STAGE/Applications"
 hdiutil create -quiet -volname "Quoth" -srcfolder "$STAGE" -fs HFS+ -format UDZO -imagekey zlib-level=9 "$DMG"
 hdiutil verify -quiet "$DMG"
 (cd "$OUT" && shasum -a 256 "Quoth-$VERSION.dmg" > "Quoth-$VERSION.dmg.sha256")
+# The same file under a fixed name, for the README's ".../releases/latest/download/Quoth.dmg" link.
+cp -f "$DMG" "$OUT/Quoth.dmg"
 
 # 5. Sparkle: sign the DMG with the update key and write the appcast (just this release).
 if [ -n "${SPARKLE_KEY_FILE:-}" ]; then KEY=(--ed-key-file "$SPARKLE_KEY_FILE"); else KEY=(--account app.quoth); fi
@@ -89,4 +91,4 @@ echo
 echo "Built $DMG ($(du -h "$DMG" | cut -f1)), $(cut -d' ' -f1 "$DMG.sha256")"
 echo "Test it on a Mac (or user account) without Quoth, then publish:"
 echo "  git tag v$VERSION && git push origin v$VERSION"
-echo "  gh release create v$VERSION $DMG $DMG.sha256 $OUT/appcast.xml --title \"Quoth $VERSION\" --notes-file docs/release-notes.md"
+echo "  gh release create v$VERSION $DMG $OUT/Quoth.dmg $DMG.sha256 $OUT/appcast.xml --title \"Quoth $VERSION\" --notes-file docs/release-notes.md"

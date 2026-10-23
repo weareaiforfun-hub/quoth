@@ -26,19 +26,26 @@ Quoth is an independent open-source project and isn't affiliated with any commer
 | **Models you choose** | Swap speech and language models per job, download them in-app, and compare them side by side in the Model Lab. |
 | **AI-app access (MCP)** | Lets Claude and other MCP clients read your meeting and Scratchpad notes (read-only, never dictations). |
 
-## Requirements
+## Download
 
-- A Mac with **Apple Silicon** (M1 or later) and **macOS 14 Sonoma** or later
-- **Memory:** 16 GB works (7B model); 32 GB+ recommended for the default 14B model. 8 GB Macs can use the 4B model or a cloud API.
-- **Disk:** about 1 GB for speech, plus 2–9 GB for the language model
-- Homebrew and the Xcode Command Line Tools (`xcode-select --install`); full Xcode is not needed
+<p align="center"><a href="https://github.com/weareaiforfun-hub/quoth/releases/latest/download/Quoth.dmg"><b>⬇ Download Quoth for Mac</b></a><br>
+<sub>Free · Apple Silicon (M1 or later) · macOS 14 or later · <a href="https://github.com/weareaiforfun-hub/quoth/releases/latest">release notes</a></sub></p>
 
-## Quick start
+1. Open the downloaded **Quoth.dmg** and drag **Quoth** onto **Applications**.
+2. Open Quoth. The first time, macOS says it can't check Quoth for malicious software, because this free project isn't registered with Apple ($99 a year). Click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll to **Security**, click **Open Anyway** next to "Quoth was blocked", and confirm with your password. You only do this once; updates install by themselves.
+4. On the **Setup** page, download the AI models (the right size for your Mac is preselected) and grant the permissions. Then hold **Fn** and talk.
+
+**Memory:** 8 GB Macs get the Lite models; 16 GB, Standard; 32 GB or more, Best. **Disk:** 3–10 GB for the models. A cloud API works too, with your own key.
+
+## Build from source
+
+You need the Xcode Command Line Tools (`xcode-select --install`; full Xcode isn't needed) and Homebrew.
 
 ```bash
 git clone https://github.com/weareaiforfun-hub/quoth.git && cd quoth
 scripts/setup.sh              # installs cmake, downloads models sized to your Mac
-scripts/build-app.sh --open   # builds and installs ~/Applications/Quoth.app
+scripts/build-app.sh --open   # builds the engines and the app, installs ~/Applications/Quoth.app
 ```
 
 Then follow **[Getting started](docs/getting-started.md)**: grant three permissions, hold the hotkey, and talk.

@@ -63,13 +63,14 @@ The first `release.sh` run may ask whether `sign_update` may use the key: choose
 4. Publish (the commands are printed at the end of `release.sh`):
    ```bash
    git tag v0.4.0 && git push origin v0.4.0
-   gh release create v0.4.0 build/release/Quoth-0.4.0.dmg build/release/Quoth-0.4.0.dmg.sha256 \
-     build/release/appcast.xml --title "Quoth 0.4.0" --notes-file docs/release-notes.md
+   gh release create v0.4.0 build/release/Quoth-0.4.0.dmg build/release/Quoth.dmg \
+     build/release/Quoth-0.4.0.dmg.sha256 build/release/appcast.xml \
+     --title "Quoth 0.4.0" --notes-file docs/release-notes.md
    ```
 
 Version numbers follow `X.Y.Z`. The build number is the commit count, so it always increases (Sparkle compares build numbers).
 
-Installed apps read `https://github.com/weareaiforfun-hub/quoth/releases/latest/download/appcast.xml`, which GitHub redirects to the newest release's `appcast.xml`. So every release must include its `appcast.xml`, and drafts or pre-releases don't count as "latest".
+Installed apps read `https://github.com/weareaiforfun-hub/quoth/releases/latest/download/appcast.xml`, which GitHub redirects to the newest release's `appcast.xml`. So every release must include its `appcast.xml` and a copy of the DMG named `Quoth.dmg` (the README's download link), and drafts or pre-releases don't count as "latest".
 
 ### Testing an update locally
 
