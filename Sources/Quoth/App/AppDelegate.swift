@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         llama.onStatus = { [weak self] s in self?.state.textEngineStatus = s }
         startBackends()
         stopEnginesOnSIGTERM()
+        Updater.shared.start()
         // A finished model download: start (or switch) the engines that were waiting for it.
         DownloadCenter.shared.onInstalled = { [weak self] _ in self?.startBackends() }
         DownloadCenter.shared.resumePendingBundle()
@@ -221,6 +222,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         }
+        // "update": check the feed in the background and download + install silently (installs on quit).
+        center.addObserver(forName: .init("app.quoth.debug.update"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                guard let u = Updater.shared.updater else { return }
+                u.automaticallyChecksForUpdates = true
+                u.automaticallyDownloadsUpdates = true
+                u.checkForUpdatesInBackground()
+            }
+        }
+        // "quit": a normal quit, as from the menu (Sparkle installs a downloaded update then).
+        center.addObserver(forName: .init("app.quoth.debug.quit"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { NSApp.terminate(nil) }
+        }
         // "axprobe": what Accessibility sees in the frontmost app → ax-probe.json
         center.addObserver(forName: .init("app.quoth.debug.axprobe"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
@@ -253,6 +267,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesAction), keyEquivalent: "")
+        check.target = self
+        appMenu.addItem(check)
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         appMenu.addItem(withTitle: "Quit Quoth", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
@@ -326,6 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         provider.submenu = psub
         menu.addItem(provider)
         menu.addItem(.separator())
+        if Updater.shared.isAvailable { menu.addItem(item("Check for Updates…", #selector(checkForUpdatesAction))) }
         menu.addItem(item("Quit Quoth", #selector(quitAction), key: "q"))
     }
 
@@ -336,6 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openHubAction() { openHub() }
+    @objc private func checkForUpdatesAction() { Updater.shared.checkForUpdates() }
     @objc private func scratchpadAction() { scratchpad.toggle() }
     @objc private func meetingAction() {
         Task { meetings.isRecording ? await meetings.stop() : await meetings.start() }

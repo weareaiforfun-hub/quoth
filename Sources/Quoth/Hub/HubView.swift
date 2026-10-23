@@ -238,6 +238,7 @@ struct SettingsView: View {
                 }
                 Button("Reveal data folder") { NSWorkspace.shared.open(AppPaths.support) }
             }
+            UpdatesSection()
         }
         .formStyle(.grouped)
         .onAppear { mics = MicrophoneManager.inputDevices() }
@@ -354,6 +355,30 @@ struct LanguagesPicker: View {
                 }
             }
             .fixedSize()
+        }
+    }
+}
+
+/// Settings → Updates: Sparkle's automatic checks and a manual check.
+struct UpdatesSection: View {
+    @State private var automatic = Updater.shared.updater?.automaticallyChecksForUpdates ?? false
+    @State private var autoInstall = Updater.shared.updater?.automaticallyDownloadsUpdates ?? false
+
+    var body: some View {
+        Section("Updates") {
+            LabeledContent("Version", value: Updater.shared.version)
+            if Updater.shared.isAvailable {
+                Toggle("Check for updates automatically", isOn: $automatic)
+                    .onChange(of: automatic) { _, v in Updater.shared.updater?.automaticallyChecksForUpdates = v }
+                Toggle("Download and install updates automatically", isOn: $autoInstall)
+                    .disabled(!automatic)
+                    .onChange(of: autoInstall) { _, v in Updater.shared.updater?.automaticallyDownloadsUpdates = v }
+                Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+                Text("Checks ask GitHub once a day whether a newer Quoth exists; nothing about you or your dictations is sent.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Updates aren't available in development builds.").font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }

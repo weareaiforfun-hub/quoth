@@ -18,4 +18,5 @@ You only do steps 3–4 once; updates open normally. You can check the download 
 - **First-run setup:**
   - Choose Lite, Standard or Best models for your Mac's memory.
   - The download resumes if interrupted, and every file's checksum is verified.
+- **Automatic updates:** Quoth can keep itself up to date (Settings → Updates). Updates are signed and verified, and install without the "Open Anyway" step.
 - **Ollama and cloud APIs** still work as options in Models.

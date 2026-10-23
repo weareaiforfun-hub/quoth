@@ -19,6 +19,10 @@ APP="build/Quoth.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Quoth"
+# Sparkle (automatic updates) lives in Contents/Frameworks.
+mkdir -p "$APP/Contents/Frameworks"
+ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Quoth"
 cp "$MCP" "$APP/Contents/MacOS/quoth-mcp"
 cp build/engines/whisper-server build/engines/llama-server "$APP/Contents/MacOS/"
 mkdir -p "$APP/Contents/Resources/Licenses"
@@ -26,8 +30,10 @@ cp build/engines/licenses/* build/engines/VERSIONS.txt "$APP/Contents/Resources/
 cp Sources/Quoth/Resources/Info.plist "$APP/Contents/Info.plist"
 if [ -n "${QUOTH_VERSION:-}" ]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $QUOTH_VERSION" "$APP/Contents/Info.plist"
-  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD)" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${QUOTH_BUILD:-$(git rev-list --count HEAD)}" "$APP/Contents/Info.plist"
 fi
+# Testing only: another update key or feed than the ones in Info.plist.
+[ -n "${SPARKLE_PUBLIC_KEY:-}" ] && /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $SPARKLE_PUBLIC_KEY" "$APP/Contents/Info.plist"
 cp Sources/Quoth/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # Model Lab inputs: test sentences and speech samples.
 cp Evals/cleanup-golden.jsonl "$APP/Contents/Resources/"
@@ -43,7 +49,13 @@ else
   echo "warning: no 'Quoth Dev' certificate found (run scripts/setup.sh); signing ad-hoc." >&2
   SIGN="-"
 fi
-# Helpers first (each with its own identifier), then the app around them.
+# Inside out: Sparkle's helpers (as Sparkle documents), then ours, then the app around them.
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+codesign --force --sign "$SIGN" "$SPK/XPCServices/Installer.xpc"
+codesign --force --sign "$SIGN" --preserve-metadata=entitlements "$SPK/XPCServices/Downloader.xpc"
+codesign --force --sign "$SIGN" "$SPK/Autoupdate"
+codesign --force --sign "$SIGN" "$SPK/Updater.app"
+codesign --force --sign "$SIGN" "$APP/Contents/Frameworks/Sparkle.framework"
 for helper in quoth-mcp whisper-server llama-server; do
   codesign --force --sign "$SIGN" --identifier "app.quoth.$helper" "$APP/Contents/MacOS/$helper"
 done
