@@ -25,6 +25,8 @@ final class DictationController {
     private var lastTransform: (original: String, result: String, name: String)?
     private var lastAutoTransform = Date.distantPast
     var onScratchpad: (() -> Void)?
+    /// Opens the Hub (on the page `state.hubSection` names).
+    var onNeedsSetup: (() -> Void)?
     private let learner = AutoLearner()
     private var audioURL: URL?
     private var tapTimer: Task<Void, Never>?
@@ -123,6 +125,15 @@ final class DictationController {
     // MARK: recording
 
     private func begin() {
+        // Before the first model download finishes there is nothing to dictate with: say so, and show Setup.
+        if let missing = state.settings.missingLocalModels.first {
+            mode = .idle
+            let downloading = DownloadCenter.shared.isBusy((missing as NSString).lastPathComponent)
+            showMessage(downloading ? "Models still downloading. See Quoth → Setup" : "Download the AI models first: Quoth → Setup", isError: true)
+            state.hubSection = HubSection.setup.rawValue
+            onNeedsSetup?()
+            return
+        }
         let id = UUID().uuidString
         audioURL = state.settings.retention == .never ? nil : AppPaths.audio.appendingPathComponent("\(id).wav")
         let device = MicrophoneManager.bestDevice(preferred: state.settings.preferredMicUIDs, excluding: failedDevices)
@@ -238,6 +249,9 @@ final class DictationController {
     func makeLLM(role: ModelRole = .commands) -> (any LLMClient)? {
         let s = state.settings
         switch s.textProvider {
+        case .local where s.localTextEngine == .builtIn:
+            // One model serves every job, so per-role choices apply to Ollama only.
+            return LlamaServer.client(port: s.llamaPort, modelPath: s.llamaModelPath)
         case .local:
             return OllamaCleaner(baseURL: URL(string: s.ollamaBaseURL) ?? URL(string: "http://127.0.0.1:11434")!,
                                  model: s.ollamaModel(for: role))
@@ -476,7 +490,10 @@ final class DictationController {
             record.error = error.localizedDescription
             save(record)
             log.error("dictation failed: \(error.localizedDescription, privacy: .public)")
-            showMessage("Transcription failed. Retry in History", isError: true)
+            let s = state.settings
+            showMessage(s.speechProvider == .local && state.whisperStatus != "Ready"
+                        ? "Speech model not ready (\(state.whisperStatus)). Retry in History"
+                        : "Transcription failed. Retry in History", isError: true)
         }
     }
 

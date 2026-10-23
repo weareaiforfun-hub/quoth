@@ -7,7 +7,7 @@ Quoth uses AI models for two separate jobs:
 | Job | What it does | Default | Runs with |
 | --- | --- | --- | --- |
 | **Speech recognition** | Turns your voice into raw text | OpenAI **Whisper Large v3 Turbo** (open source, MIT) | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) on your Mac |
-| **Language model** | Turns raw text into what you meant (cleanup), follows commands, rewrites, writes meeting notes | Alibaba **Qwen 2.5 14B Instruct** (open weights, Apache-2.0) | [Ollama](https://ollama.com) on your Mac |
+| **Language model** | Turns raw text into what you meant (cleanup), follows commands, rewrites, writes meeting notes | Alibaba **Qwen 2.5 14B Instruct** (open weights, Apache-2.0) | [llama.cpp](https://github.com/ggml-org/llama.cpp), built into Quoth (or [Ollama](https://ollama.com), if you prefer) |
 
 They aren't interchangeable. Qwen 2.5 is a text model: it can't listen to audio. Whisper only transcribes: it can't follow instructions or rewrite text. So "Qwen instead of Whisper" doesn't work, but you can swap the model **within** each job, and mix where each runs (e.g. local Whisper + a cloud language model).
 
@@ -18,7 +18,10 @@ Some newer models do understand audio (e.g. Qwen's audio models, or OpenAI's `gp
 Quoth → **Models**:
 
 - **Speech recognition:** choose This Mac or Cloud. For This Mac, pick a Whisper model; ones you don't have show a **Download** button.
-- **Language models:** choose This Mac (Ollama) or Cloud, then a model per job:
+- **Language models:** choose where they run:
+  - **This Mac (built in):** pick a model file; ones you don't have show a **Download** button. One model does every job.
+    - Qwen 2.5 14B (9 GB, for 32 GB+ Macs), Qwen 2.5 7B (4.7 GB, 16 GB) or Qwen 3 4B (2.5 GB, 8 GB), all Apache-2.0, Q4_K_M quantisation.
+  - **This Mac (Ollama)** if you already use Ollama, or **Cloud**, then a model per job:
   - **Dictation cleanup** runs on every dictation, so speed matters most.
   - **Command Mode & Transforms** benefits from a smarter model.
   - **Meeting notes** runs after the meeting, so a large model is fine.
@@ -48,8 +51,8 @@ The same comparisons run from the command line: `swift run quoth-eval --model <t
 
 | Model | Same words | Serious errors | Typical time | Notes |
 | --- | --- | --- | --- | --- |
-| Qwen 2.5 14B *(default)* | 61/66 | 0 | ~0.9 s | Best overall |
-| Qwen 2.5 7B | 57/64* | 2* | ~0.45 s | Sometimes answers questions or garbles corrections |
+| Qwen 2.5 14B *(default)* | 62/66 | 0 | ~0.7 s | Best overall |
+| Qwen 2.5 7B | 62/66 | 0 | ~0.35 s | Sometimes answers a dictated request; the pipeline catches it and asks again |
 | Gemma 3 12B | 57/64* | 0* | ~7 s | Accurate but can't reuse the prompt cache, so slow per dictation |
 
 \* Measured on an earlier version of the set (64 sentences). Re-run them yourself in the Model Lab: on the 19-sentence quick set, 14B scored 14 exact and 7B 11 exact, both with 0 serious errors.
@@ -95,4 +98,4 @@ With a cloud API your audio and/or text is sent to that provider under their pri
 | Llama 3.2 | Llama 3.2 Community Licence |
 | Gemma 3 | Gemma Terms of Use |
 
-The models are downloaded from Hugging Face (Whisper) and the Ollama library; Quoth's repository doesn't contain model weights.
+The models are downloaded from Hugging Face (Whisper, and the GGUF language models) or the Ollama library; Quoth's repository doesn't contain model weights.

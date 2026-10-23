@@ -9,6 +9,11 @@ let package = Package(
         .executable(name: "quoth-eval", targets: ["quoth-eval"]),
         .executable(name: "quoth-mcp", targets: ["quoth-mcp"]),
     ],
+    dependencies: [
+        // Automatic updates (MIT). Pinned: build-app.sh embeds and re-signs it; release.sh uses the
+        // same version's tools.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+    ],
     targets: [
         .target(
             name: "QuothCore",
@@ -16,7 +21,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "Quoth",
-            dependencies: ["QuothCore"],
+            dependencies: ["QuothCore", .product(name: "Sparkle", package: "Sparkle")],
             exclude: ["Resources"],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("AVFoundation"), .linkedFramework("CoreAudio")]

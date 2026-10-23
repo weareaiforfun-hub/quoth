@@ -31,9 +31,11 @@ Delete everything by quitting Quoth and removing that folder.
 
 ## What leaves your Mac
 
-- **Local mode (default):** nothing. whisper.cpp and Ollama run on `127.0.0.1`.
+- **Local mode (default):** nothing. whisper.cpp and llama.cpp (or Ollama, if you chose it) run on `127.0.0.1`.
 - **Cloud mode** (your choice, per job): the audio and/or text for that job goes to the provider you configured, under their terms.
-- **Model downloads** come from Hugging Face and the Ollama library.
+- **Model downloads** come from Hugging Face (and the Ollama library if you use Ollama).
+- **Diagnostics** (Settings → Help) are only copied to your clipboard; nothing is sent unless you paste them somewhere yourself. They contain versions, settings, permissions and engine error lines, never dictations, your dictionary or notes, and your home folder is replaced by `~`.
+- **Update checks** (if you allow them; Quoth asks on its second launch, and Settings → Updates changes it): about once a day Quoth fetches a small file from GitHub listing the newest version. It sends only what any download sends (IP address, and Quoth's version in the user agent); nothing about you or your dictations.
 - **Command Mode web search** opens Perplexity in your browser with your query.
 - **MCP (optional):** apps you connect (e.g. Claude Desktop) can read your meeting notes and Scratchpad notes, never dictations. Turn it off in Settings → AI apps.
 

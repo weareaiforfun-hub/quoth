@@ -18,10 +18,18 @@ public enum CleanupLevel: String, Codable, CaseIterable, Sendable {
 }
 
 public enum ProviderKind: String, Codable, CaseIterable, Sendable {
-    /// whisper.cpp server + Ollama on this Mac. Free, private.
+    /// Engines on this Mac (whisper.cpp; llama.cpp or Ollama). Free, private.
     case local
     /// Any OpenAI-compatible API (Groq, OpenAI…) with your own key.
     case cloud
+}
+
+/// Which engine runs language models when text is processed on this Mac.
+public enum LocalTextEngine: String, Codable, CaseIterable, Sendable {
+    /// llama.cpp's `llama-server`, shipped inside Quoth.app, with a GGUF model file.
+    case builtIn
+    /// A separately installed Ollama (power users; allows a different model per job).
+    case ollama
 }
 
 public enum HotkeyChoice: String, Codable, CaseIterable, Sendable {
@@ -63,6 +71,10 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public var whisperModelPath: String = AppPaths.models.appendingPathComponent("ggml-large-v3-turbo-q5_0.bin").path
     public var whisperPort: Int = 8178
+    public var localTextEngine: LocalTextEngine = .builtIn
+    /// GGUF model run by the built-in llama-server (one model serves every text job).
+    public var llamaModelPath: String = AppPaths.models.appendingPathComponent(ModelCatalog.defaultGGUF.file).path
+    public var llamaPort: Int = 8179
     public var ollamaBaseURL: String = "http://127.0.0.1:11434"
     public var ollamaModel: String = "qwen2.5:14b-instruct"
 
@@ -110,6 +122,15 @@ public struct Settings: Codable, Equatable, Sendable {
 
     public var llmTimeout: Double { textProvider == .local ? llmTimeoutLocal : llmTimeoutCloud }
 
+    /// The model name shown for the cleanup job, whichever engine runs it.
+    public var textModelName: String {
+        switch (textProvider, localTextEngine) {
+        case (.cloud, _): cloudLLMModel
+        case (.local, .builtIn): ModelCatalog.ggufInfo(forPath: llamaModelPath)?.name ?? (llamaModelPath as NSString).lastPathComponent
+        case (.local, .ollama): ollamaModel
+        }
+    }
+
     /// The Ollama model used for a text role.
     public func ollamaModel(for role: ModelRole) -> String {
         let m = switch role {
@@ -133,6 +154,10 @@ public struct Settings: Codable, Equatable, Sendable {
         textProvider = try c.decodeIfPresent(ProviderKind.self, forKey: .textProvider) ?? oldProvider ?? d.textProvider
         whisperModelPath = try c.decodeIfPresent(String.self, forKey: .whisperModelPath) ?? d.whisperModelPath
         whisperPort = try c.decodeIfPresent(Int.self, forKey: .whisperPort) ?? d.whisperPort
+        // Settings written before the built-in engine existed were using Ollama: keep it that way.
+        localTextEngine = try c.decodeIfPresent(LocalTextEngine.self, forKey: .localTextEngine) ?? .ollama
+        llamaModelPath = try c.decodeIfPresent(String.self, forKey: .llamaModelPath) ?? d.llamaModelPath
+        llamaPort = try c.decodeIfPresent(Int.self, forKey: .llamaPort) ?? d.llamaPort
         ollamaBaseURL = try c.decodeIfPresent(String.self, forKey: .ollamaBaseURL) ?? d.ollamaBaseURL
         ollamaModel = try c.decodeIfPresent(String.self, forKey: .ollamaModel) ?? d.ollamaModel
         cloudBaseURL = try c.decodeIfPresent(String.self, forKey: .cloudBaseURL) ?? d.cloudBaseURL

@@ -25,6 +25,8 @@ final class AppState: ObservableObject {
         didSet { if personal != oldValue { PersonalStore.save(personal) } }
     }
     @Published var whisperStatus: String = "Starting…"
+    /// The built-in language model engine (llama-server), or "Ollama"/"Cloud".
+    @Published var textEngineStatus: String = "Starting…"
     @Published var lastLatency: String = ""
     /// Recording a Command Mode instruction (the Earshot pill turns orange).
     @Published var commandActive = false

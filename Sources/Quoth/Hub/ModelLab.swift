@@ -30,7 +30,7 @@ final class ModelLab: ObservableObject {
     // MARK: cleanup
 
     /// - Parameters:
-    ///   - models: Ollama tags (or "cloud" for the configured cloud model).
+    ///   - models: Ollama tags, "builtin" for the model the built-in engine has loaded, or "cloud" for the configured cloud model.
     ///   - quick: 12 representative test sentences instead of all of them.
     func runCleanup(models: [String], quick: Bool, includeRecent: Bool) async {
         guard !running, !models.isEmpty else { return }
@@ -71,6 +71,9 @@ final class ModelLab: ObservableObject {
 
     private func cleanerFor(_ model: String) -> (any Cleaner)? {
         let s = state.settings
+        if model == "builtin" {
+            return LlamaServer.client(port: s.llamaPort, modelPath: s.llamaModelPath)
+        }
         if model == "cloud" {
             guard let key = Keychain.apiKey(), let url = URL(string: s.cloudBaseURL) else { return nil }
             return ChatCompletionsCleaner(baseURL: url, model: s.cloudLLMModel, apiKey: key)
@@ -155,7 +158,7 @@ final class ModelLab: ObservableObject {
     }
 
     static func startTempServer(modelPath: String, port: Int) -> Process? {
-        guard let bin = WhisperServerProcess.findBinary() else { return nil }
+        guard let bin = EngineProcess.findBinary("whisper-server") else { return nil }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
         p.arguments = ["-m", modelPath, "--host", "127.0.0.1", "--port", "\(port)", "-t", "6"]

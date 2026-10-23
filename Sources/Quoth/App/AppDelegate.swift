@@ -7,7 +7,9 @@ import QuothCore
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let state = AppState.shared
     let hotkeys = HotkeyMonitor()
-    let whisper = WhisperServerProcess()
+    let whisper = EngineProcess(.whisper)
+    let llama = EngineProcess(.llama)
+    private var termSignal: DispatchSourceSignal?
     var earshot: EarshotController!
     var controller: DictationController!
     let scratchpad = ScratchpadController()
@@ -22,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         controller = DictationController(state: state, hotkeys: hotkeys, earshot: earshot)
         earshot.onOpenHub = { [weak self] in self?.openHub() }
         controller.onScratchpad = { [weak self] in self?.scratchpad.toggle() }
+        controller.onNeedsSetup = { [weak self] in self?.openHub() }
         meetings = MeetingController(state: state, dictation: controller)
         meetings.onMessage = { [weak self] text, isError in self?.controller.showMessage(text, isError: isError) }
         meetings.onChange = { [weak self] in self?.updateStatusIcon() }
@@ -30,7 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setUpStatusItem()
 
         whisper.onStatus = { [weak self] s in self?.state.whisperStatus = s }
+        llama.onStatus = { [weak self] s in self?.state.textEngineStatus = s }
         startBackends()
+        stopEnginesOnSIGTERM()
+        Updater.shared.start()
+        // A finished model download: start (or switch) the engines that were waiting for it.
+        DownloadCenter.shared.onInstalled = { [weak self] _ in self?.startBackends() }
+        DownloadCenter.shared.resumePendingBundle()
 
         state.onSettingsChanged = { [weak self] old in self?.settingsChanged(from: old) }
         installDebugHooks()
@@ -49,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             openHub()
             waitForPermissions()
         }
+        if !state.settings.missingLocalModels.isEmpty { openHub() }
     }
 
     /// `open Quoth.app` while it is running: show the Hub instead of doing nothing.
@@ -59,6 +69,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         whisper.stop()
+        llama.stop()
+    }
+
+    /// `pkill Quoth` (and logout) sends SIGTERM, which skips applicationWillTerminate: stop the engines first.
+    private func stopEnginesOnSIGTERM() {
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler { [weak self] in
+            MainActor.assumeIsolated {
+                self?.whisper.stop()
+                self?.llama.stop()
+            }
+            exit(0)
+        }
+        source.resume()
+        termSignal = source
     }
 
     private func startBackends() {
@@ -69,7 +95,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             whisper.stop()
             state.whisperStatus = "Cloud"
         }
-        if s.textProvider == .local, let url = URL(string: s.ollamaBaseURL) {
+        if s.textProvider == .local && s.localTextEngine == .builtIn {
+            llama.start(modelPath: s.llamaModelPath, port: s.llamaPort)
+        } else {
+            llama.stop()
+            state.textEngineStatus = s.textProvider == .cloud ? "Cloud" : "Ollama"
+        }
+        if s.textProvider == .local && s.localTextEngine == .ollama, let url = URL(string: s.ollamaBaseURL) {
             Task.detached { await OllamaCleaner(baseURL: url, model: s.ollamaModel).warmUp() }
         }
     }
@@ -79,10 +111,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         applyHotkeySettings()
         earshot.applySettings()
         let whisperChanged = s.whisperModelPath != old.whisperModelPath || s.whisperPort != old.whisperPort
+        let llamaChanged = s.llamaModelPath != old.llamaModelPath || s.llamaPort != old.llamaPort
         if whisperChanged && s.speechProvider == .local {
-            whisper.restart(modelPath: s.whisperModelPath, port: s.whisperPort)
-        } else if s.speechProvider != old.speechProvider || s.textProvider != old.textProvider
-                    || s.ollamaModel != old.ollamaModel || s.ollamaBaseURL != old.ollamaBaseURL {
+            whisper.start(modelPath: s.whisperModelPath, port: s.whisperPort)
+        }
+        if llamaChanged && s.textProvider == .local && s.localTextEngine == .builtIn {
+            llama.start(modelPath: s.llamaModelPath, port: s.llamaPort)
+        }
+        if s.speechProvider != old.speechProvider || s.textProvider != old.textProvider || s.localTextEngine != old.localTextEngine
+            || s.ollamaModel != old.ollamaModel || s.ollamaBaseURL != old.ollamaBaseURL {
             startBackends()
         }
         if s.retention != old.retention { controller.reloadHistory() }
@@ -129,7 +166,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let path = n.object as? String else { return }
             MainActor.assumeIsolated { self?.controller.simulateDictation(wavPath: path, command: true) }
         }
-        // "lab" with "cleanup|tag1,tag2" or "speech|file1,file2" or "download|file": writes lab-report.json.
+        // "lab" with "cleanup|tag1,tag2", "speech|file1,file2", "download|file", "bundle|lite": writes lab-report.json.
+        // "pause|file" and "cancelbundle|-" act without a report.
         center.addObserver(forName: .init("app.quoth.debug.lab"), object: nil, queue: .main) { [weak self] n in
             guard let self, let parts = (n.object as? String)?.components(separatedBy: "|"), parts.count == 2 else { return }
             let items = parts[1].components(separatedBy: ",")
@@ -139,14 +177,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 Task { @MainActor in
                     var report: [String: Any] = ["kind": parts[0]]
                     switch parts[0] {
-                    case "download":
-                        guard let m = ModelCatalog.speech.first(where: { $0.file == items[0] }) else { return }
+                    case "download", "bundle":
+                        // Through DownloadCenter, like the UI; waits until finished, failed or paused.
+                        let center = DownloadCenter.shared
+                        let files: [DownloadItem]
+                        if parts[0] == "bundle" {
+                            guard let b = ModelBundle(rawValue: items[0]) else { return }
+                            files = b.downloads
+                            center.install(b)
+                        } else {
+                            let all = ModelCatalog.speech.map(\.download) + ModelCatalog.gguf.map(\.download)
+                            guard let item = all.first(where: { $0.file == items[0] }) else { return }
+                            files = [item]
+                            center.enqueue(files)
+                        }
                         let t = Date()
-                        do {
-                            _ = try await ModelDownloader().download(m.url, to: AppPaths.models.appendingPathComponent(m.file)) { _ in }
-                            report["ok"] = true
-                        } catch { report["error"] = error.localizedDescription }
+                        while files.contains(where: { center.isBusy($0.file) }) { try? await Task.sleep(nanoseconds: 300_000_000) }
                         report["seconds"] = Int(Date().timeIntervalSince(t))
+                        report["files"] = files.map { f -> [String: Any] in
+                            var r: [String: Any] = ["file": f.file, "installed": center.isInstalled(f)]
+                            if let res = center.results[f.file] { r["resumedFrom"] = res.resumedFrom; r["alreadyInstalled"] = res.alreadyInstalled }
+                            if let st = center.status[f.file] { r["status"] = st.detail }
+                            return r
+                        }
+                        report["pendingBundle"] = center.pendingBundle?.rawValue ?? ""
+                        report["llamaModelAfter"] = self.state.settings.llamaModelPath
+                    case "pause":
+                        DownloadCenter.shared.pause(items[0])
+                        return
+                    case "cancelbundle":
+                        DownloadCenter.shared.cancelBundle()
+                        return
                     case "speech":
                         await lab.runSpeech(models: items, useRecordings: false)
                         report["results"] = lab.speech.map { ["sample": $0.sample, "model": $0.model, "text": $0.text, "ms": $0.ms, "wer": $0.wer ?? -1] }
@@ -161,6 +222,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try? JSONSerialization.data(withJSONObject: report, options: .prettyPrinted).write(to: out)
                 }
             }
+        }
+        // "update": check the feed in the background and download + install silently (installs on quit).
+        center.addObserver(forName: .init("app.quoth.debug.update"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                guard let u = Updater.shared.updater else { return }
+                u.automaticallyChecksForUpdates = true
+                u.automaticallyDownloadsUpdates = true
+                u.checkForUpdatesInBackground()
+            }
+        }
+        // "diagnostics": what Copy Diagnostics would copy → diagnostics.txt
+        center.addObserver(forName: .init("app.quoth.debug.diagnostics"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                try? DiagnosticsCollector.report(state: self.state)
+                    .write(to: AppPaths.support.appendingPathComponent("diagnostics.txt"), atomically: true, encoding: .utf8)
+            }
+        }
+        // "quit": a normal quit, as from the menu (Sparkle installs a downloaded update then).
+        center.addObserver(forName: .init("app.quoth.debug.quit"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { NSApp.terminate(nil) }
         }
         // "axprobe": what Accessibility sees in the frontmost app → ax-probe.json
         center.addObserver(forName: .init("app.quoth.debug.axprobe"), object: nil, queue: .main) { _ in
@@ -194,6 +276,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesAction), keyEquivalent: "")
+        check.target = self
+        appMenu.addItem(check)
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         appMenu.addItem(withTitle: "Quit Quoth", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
@@ -267,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         provider.submenu = psub
         menu.addItem(provider)
         menu.addItem(.separator())
+        if Updater.shared.isAvailable { menu.addItem(item("Check for Updates…", #selector(checkForUpdatesAction))) }
         menu.addItem(item("Quit Quoth", #selector(quitAction), key: "q"))
     }
 
@@ -277,6 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openHubAction() { openHub() }
+    @objc private func checkForUpdatesAction() { Updater.shared.checkForUpdates() }
     @objc private func scratchpadAction() { scratchpad.toggle() }
     @objc private func meetingAction() {
         Task { meetings.isRecording ? await meetings.stop() : await meetings.start() }

@@ -1,6 +1,8 @@
 // Runs the cleanup stage over Evals/cleanup-golden.jsonl and scores it.
 //
 //   swift run quoth-eval                       # local Ollama, model from settings
+//   swift run quoth-eval --builtin             # the app's built-in llama-server (must be running)
+//   swift run quoth-eval --builtin --port 8190 --gguf model.gguf   # another llama-server you started
 //   swift run quoth-eval --model gemma3:12b
 //   swift run quoth-eval --cloud               # cloud provider from settings + keychain key
 //   swift run quoth-eval --verbose --only no-answer
@@ -17,6 +19,7 @@ var args = Array(CommandLine.arguments.dropFirst())
 
 let settings = SettingsStore.load()
 let cloud = flag("--cloud")
+let builtin = flag("--builtin")
 let verbose = flag("--verbose")
 let only = option("--only")
 let level = option("--level").flatMap(CleanupLevel.init(rawValue:)) ?? .light
@@ -31,6 +34,15 @@ if cloud {
     let model = option("--model") ?? settings.cloudLLMModel
     cleaner = ChatCompletionsCleaner(baseURL: URL(string: settings.cloudBaseURL)!, model: model, apiKey: key)
     label = "cloud \(model)"
+} else if builtin {
+    // --port/--gguf: a llama-server you started yourself, e.g. to try a model without switching the app.
+    let port = option("--port").flatMap(Int.init) ?? settings.llamaPort
+    let c = LlamaServer.client(port: port, modelPath: option("--gguf") ?? settings.llamaModelPath)
+    guard await LlamaServer.loadedModel(port: port) == c.model else {
+        print("llama-server isn't serving \(c.model) on port \(port): start Quoth with the built-in engine first"); exit(1)
+    }
+    cleaner = c
+    label = "built-in \(c.model)"
 } else {
     let model = option("--model") ?? settings.ollamaModel
     let c = OllamaCleaner(baseURL: URL(string: settings.ollamaBaseURL)!, model: model)

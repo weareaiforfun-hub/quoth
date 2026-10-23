@@ -38,7 +38,8 @@ struct HubView: View {
     let controller: DictationController
     @ObservedObject var meetings: MeetingController
     private var section: Binding<HubSection?> {
-        Binding(get: { HubSection(rawValue: state.hubSection ?? "") ?? (Permissions.allGranted ? .features : .setup) },
+        Binding(get: { HubSection(rawValue: state.hubSection ?? "")
+                    ?? (Permissions.allGranted && state.settings.missingLocalModels.isEmpty ? .features : .setup) },
                 set: { state.hubSection = $0?.rawValue })
     }
 
@@ -237,6 +238,8 @@ struct SettingsView: View {
                 }
                 Button("Reveal data folder") { NSWorkspace.shared.open(AppPaths.support) }
             }
+            UpdatesSection()
+            HelpSection(state: state)
         }
         .formStyle(.grouped)
         .onAppear { mics = MicrophoneManager.inputDevices() }
@@ -274,9 +277,10 @@ struct SetupView: View {
     var body: some View {
         Form {
             Section {
-                Text("Quoth needs three permissions (the fourth, for meeting notes, is optional). Grant each, then come back; this page updates by itself.")
+                Text("Two things to set up: the AI models (start the download first; it runs while you do the rest) and three permissions (the fourth, for meeting notes, is optional). This page updates by itself.")
                     .foregroundStyle(.secondary)
             }
+            ModelSetupSection(state: state)
             Section("Permissions") {
                 row("Microphone", "To hear you while you hold the hotkey.", granted: micStatus == .authorized) {
                     if micStatus == .notDetermined {
@@ -303,7 +307,8 @@ struct SetupView: View {
             Section("Engines") {
                 LabeledContent("Speech model", value: state.settings.speechProvider == .local
                                ? "\(ModelCatalog.speechInfo(forPath: state.settings.whisperModelPath)?.name ?? "Whisper"): \(state.whisperStatus)" : "Cloud")
-                LabeledContent("Cleanup model", value: state.settings.textProvider == .local ? state.settings.ollamaModel : state.settings.cloudLLMModel)
+                LabeledContent("Language model", value: state.settings.textProvider == .local && state.settings.localTextEngine == .builtIn
+                               ? "\(state.settings.textModelName): \(state.textEngineStatus)" : state.settings.textModelName)
             }
             Section("Try it") {
                 Text("Click into any text field, hold \(state.settings.hotkey.title), say “um so let's meet at two actually three”, and release.")
@@ -351,6 +356,51 @@ struct LanguagesPicker: View {
                 }
             }
             .fixedSize()
+        }
+    }
+}
+
+/// Settings → Updates: Sparkle's automatic checks and a manual check.
+struct UpdatesSection: View {
+    @State private var automatic = Updater.shared.updater?.automaticallyChecksForUpdates ?? false
+    @State private var autoInstall = Updater.shared.updater?.automaticallyDownloadsUpdates ?? false
+
+    var body: some View {
+        Section("Updates") {
+            LabeledContent("Version", value: Updater.shared.version)
+            if Updater.shared.isAvailable {
+                Toggle("Check for updates automatically", isOn: $automatic)
+                    .onChange(of: automatic) { _, v in Updater.shared.updater?.automaticallyChecksForUpdates = v }
+                Toggle("Download and install updates automatically", isOn: $autoInstall)
+                    .disabled(!automatic)
+                    .onChange(of: autoInstall) { _, v in Updater.shared.updater?.automaticallyDownloadsUpdates = v }
+                Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+                Text("Checks ask GitHub once a day whether a newer Quoth exists; nothing about you or your dictations is sent.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Updates aren't available in development builds.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// Settings → Help: diagnostics for support, without anything you dictated.
+struct HelpSection: View {
+    @ObservedObject var state: AppState
+    @State private var copied = false
+
+    var body: some View {
+        Section("Help") {
+            HStack {
+                Button(copied ? "Copied" : "Copy Diagnostics") {
+                    DiagnosticsCollector.copy(state: state)
+                    copied = true
+                    Task { try? await Task.sleep(nanoseconds: 2_000_000_000); copied = false }
+                }
+                Button("Report a Problem…") { DiagnosticsCollector.reportProblem(state: state) }
+            }
+            Text("Diagnostics list Quoth's version, your Mac model and macOS version, settings, permissions, and recent engine errors. They never include what you dictated, your dictionary or notes, or your user name. Report a Problem copies them and opens a new issue on GitHub (a free GitHub account is needed) for you to fill in.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

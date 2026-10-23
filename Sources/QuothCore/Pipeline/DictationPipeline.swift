@@ -146,18 +146,28 @@ public struct DictationPipeline: Sendable {
             return fallback
         }
         let t1 = Date()
-        do {
+        let askedForLines = SpokenPunctuation.applyLineBreaks(raw).contains("\n") || ListDetector.isEnumeration(raw)
+        func attempt(_ context: CleanupContext) async throws -> String {
             let out = try await withTimeout(effectiveTimeout(for: raw)) {
                 try await cleaner.clean(SpokenPunctuation.applyLineBreaks(raw), level: level, context: context)
             }
-            outcome.llmMs = ms(since: t1)
             var cleaned = ListDetector.restoreLeadIn(ListDetector.repairNumbering(OutputSanitizer.sanitize(out, raw: raw)), raw: raw)
-            let askedForLines = SpokenPunctuation.applyLineBreaks(raw).contains("\n") || ListDetector.isEnumeration(raw)
             if context.category != .email { cleaned = Greeting.joinOutsideEmail(cleaned) }
             if !askedForLines && context.category != .email && cleaned.contains("\n") {
                 cleaned = ListDetector.flattenUnrequested(cleaned)
             }
-            if cleaned.isEmpty || OutputSanitizer.looksLikeAnswer(cleaned, raw: raw) {
+            return cleaned
+        }
+        do {
+            var cleaned = try await attempt(context)
+            if !cleaned.isEmpty && OutputSanitizer.looksLikeAnswer(cleaned, raw: raw, level: level, variant: context.variant) {
+                // Small models sometimes carry out a dictated request. Code decides that, and asks once more.
+                var strict = context
+                strict.answeredBefore = true
+                cleaned = try await attempt(strict)
+            }
+            outcome.llmMs = ms(since: t1)
+            if cleaned.isEmpty || OutputSanitizer.looksLikeAnswer(cleaned, raw: raw, level: level, variant: context.variant) {
                 outcome.usedFallback = true
                 outcome.fallbackReason = cleaned.isEmpty ? "empty cleanup" : "cleanup added content"
                 return fallback

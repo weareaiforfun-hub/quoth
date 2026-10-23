@@ -5,20 +5,23 @@
 You need Apple Silicon, macOS 14+, the Xcode Command Line Tools and Homebrew. Full Xcode isn't required.
 
 ```bash
-scripts/setup.sh            # one-time: engines, models, signing certificate
+scripts/setup.sh            # one-time: cmake, models, signing certificate
 swift build                 # debug build of everything
-scripts/build-app.sh        # release build → build/Quoth.app → ~/Applications
+scripts/build-engines.sh    # whisper-server + llama-server from pinned source → build/engines (build-app.sh runs it if needed)
+scripts/build-app.sh        # release build + engines → build/Quoth.app → ~/Applications
 scripts/build-app.sh --open # …and launch it
 ```
 
-`build-app.sh` assembles the `.app` by hand (binary, `quoth-mcp`, Info.plist, icon, Model Lab resources) and signs it with the local "Quoth Dev" certificate. Signing with a stable identity matters: ad-hoc signatures change on every build, and macOS would drop the app's Accessibility and Input Monitoring permissions each time.
+`build-app.sh` assembles the `.app` by hand (binary, `quoth-mcp`, the two engines and their licence notices, Info.plist, icon, Model Lab resources) and signs each helper and then the app with the local "Quoth Dev" certificate.
+
+The engines are pinned in `scripts/build-engines.sh` (`WHISPER_TAG`, `LLAMA_TAG`). They are built static, with the Metal shaders embedded and a CPU baseline every Apple Silicon Mac supports, and the script refuses binaries that link anything outside macOS (`otool -L`). To update an engine, change its tag, run `scripts/build-engines.sh`, and re-run the evals. Signing with a stable identity matters: ad-hoc signatures change on every build, and macOS would drop the app's Accessibility and Input Monitoring permissions each time.
 
 The icon is generated from code: `scripts/icon/render-icons.swift` draws the concepts and `scripts/icon/make-icns.sh` builds `AppIcon.icns`.
 
 ## Tests
 
 ```bash
-scripts/test.sh             # 85 unit tests (Swift Testing)
+scripts/test.sh             # 97 unit tests (Swift Testing)
 ```
 
 Without Xcode, Swift Testing lives inside the Command Line Tools; `test.sh` adds the framework paths `swift test` needs. With Xcode installed, plain `swift test` works too.
@@ -28,6 +31,7 @@ Without Xcode, Swift Testing lives inside the Command Line Tools; `test.sh` adds
 ```bash
 swift run quoth-eval                                   # cleanup test set with your configured model
 swift run quoth-eval --model qwen2.5:7b-instruct       # another Ollama model
+swift run quoth-eval --builtin                         # the app's built-in llama-server (Quoth must be running with it)
 swift run quoth-eval --cloud                           # the cloud model (key from the app or QUOTH_API_KEY)
 swift run quoth-eval --only lists --verbose            # one category, show every output
 swift run quoth-eval --commands                        # Command Mode routing (Evals/command-golden.jsonl)
@@ -92,7 +96,8 @@ Debug hooks let any local process trigger dictations, so they're off by default.
 ```bash
 log stream --predicate 'subsystem == "app.quoth"'   # per-dictation latency and fallbacks
 tail -f ~/Library/Application\ Support/Quoth/whisper-server.log
-ollama ps                                                  # is the language model loaded?
+tail -f ~/Library/Application\ Support/Quoth/llama-server.log
+curl -s http://127.0.0.1:8179/v1/models                    # which model the built-in engine has loaded
 ```
 
 The History tab shows per-dictation latency and why cleanup was skipped.

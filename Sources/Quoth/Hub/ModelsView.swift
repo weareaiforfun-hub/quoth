@@ -7,6 +7,7 @@ struct ModelsView: View {
     @StateObject private var lab: ModelLab
     @State private var installedText: [String] = []
     @State private var progress: [String: Double] = [:]
+    @ObservedObject private var downloads = DownloadCenter.shared
     @State private var error: String?
     @State private var apiKey: String = Keychain.apiKey() ?? ""
 
@@ -36,7 +37,7 @@ struct ModelsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Two kinds of model, two different jobs", systemImage: "info.circle").font(.headline)
                 Text("**Speech recognition** turns your voice into raw text. Quoth uses OpenAI's open-source **Whisper** models, run on your Mac by whisper.cpp.")
-                Text("**Language models** turn that raw text into what you meant (cleanup), follow your commands, and write meeting notes. By default that's Alibaba's open-weights **Qwen 2.5**, run by Ollama. Llama, Gemma and Mistral work too.")
+                Text("**Language models** turn that raw text into what you meant (cleanup), follow your commands, and write meeting notes. By default that's Alibaba's open-weights **Qwen 2.5**, run on your Mac by llama.cpp, which is built into Quoth. If you use Ollama, Quoth can use its models instead (Llama, Gemma, Mistral…).")
                 Text("They aren't interchangeable: Qwen can't listen to audio and Whisper can't rewrite text. You can swap the model within each job, and mix local and cloud (e.g. local Whisper + a cloud language model).")
                     .foregroundStyle(.secondary)
             }
@@ -73,37 +74,85 @@ struct ModelsView: View {
                 Text("\(m.sizeMB) MB · \(m.notes)").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if let p = progress[m.file] {
-                ProgressView(value: p).frame(width: 90)
-            } else if installed {
-                if !active { Button("Use") { state.settings.whisperModelPath = AppPaths.models.appendingPathComponent(m.file).path } }
-            } else {
-                Button("Download") { Task { await download(m) } }
+            downloadControl(m.download, installed: installed, active: active) {
+                state.settings.whisperModelPath = AppPaths.models.appendingPathComponent(m.file).path
             }
         }
     }
 
-    private func download(_ m: SpeechModelInfo) async {
-        progress[m.file] = 0
-        defer { progress[m.file] = nil }
-        do {
-            _ = try await ModelDownloader().download(m.url, to: AppPaths.models.appendingPathComponent(m.file)) { p in
-                Task { @MainActor in progress[m.file] = p }
+    private func ggufRow(_ m: GGUFModelInfo) -> some View {
+        let installed = ModelCatalog.isInstalled(m)
+        let active = (state.settings.llamaModelPath as NSString).lastPathComponent == m.file
+        return HStack(alignment: .top) {
+            Image(systemName: active ? "largecircle.fill.circle" : "circle")
+                .foregroundStyle(active ? Color.accentColor : .secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(m.name)
+                Text("\(String(format: "%.1f", m.sizeGB)) GB download · ~\(m.ramGB) GB memory · \(m.license)\n\(m.notes)")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-        } catch {
-            self.error = "Download failed: \(error.localizedDescription)"
+            Spacer()
+            downloadControl(m.download, installed: installed, active: active) {
+                state.settings.llamaModelPath = AppPaths.models.appendingPathComponent(m.file).path
+            }
+        }
+    }
+
+    /// Download / progress + pause / resume / Use, shared by speech and language model rows.
+    @ViewBuilder
+    private func downloadControl(_ item: DownloadItem, installed: Bool, active: Bool, use: @escaping () -> Void) -> some View {
+        if let s = downloads.status[item.file] {
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack {
+                    ProgressView(value: s.fraction).frame(width: 90)
+                    if downloads.isBusy(item.file) {
+                        Button("Pause") { downloads.pause(item.file) }.controlSize(.small)
+                    } else {
+                        Button("Resume") { downloads.enqueue([item]) }.controlSize(.small)
+                    }
+                }
+                Text(s.detail).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    .frame(maxWidth: 220, alignment: .trailing)
+            }
+        } else if installed {
+            if !active { Button("Use", action: use) }
+        } else {
+            let partial = downloads.partialBytes(item)
+            Button(partial > 0 ? "Resume" : "Download") { downloads.enqueue([item]) }
         }
     }
 
     // MARK: text
 
+    /// Where language models run: built in, Ollama, or the cloud (two settings behind one picker).
+    private enum TextRunner: Hashable { case builtIn, ollama, cloud }
+
+    private var textRunner: Binding<TextRunner> {
+        Binding(get: {
+            let s = state.settings
+            return s.textProvider == .cloud ? .cloud : s.localTextEngine == .builtIn ? .builtIn : .ollama
+        }, set: { r in
+            switch r {
+            case .builtIn: state.settings.textProvider = .local; state.settings.localTextEngine = .builtIn
+            case .ollama: state.settings.textProvider = .local; state.settings.localTextEngine = .ollama
+            case .cloud: state.settings.textProvider = .cloud
+            }
+        })
+    }
+
     private var textSection: some View {
         Section("Language models") {
-            Picker("Runs on", selection: $state.settings.textProvider) {
-                Text("This Mac (Ollama)").tag(ProviderKind.local)
-                Text("Cloud API").tag(ProviderKind.cloud)
+            Picker("Runs on", selection: textRunner) {
+                Text("This Mac (built in)").tag(TextRunner.builtIn)
+                Text("This Mac (Ollama)").tag(TextRunner.ollama)
+                Text("Cloud API").tag(TextRunner.cloud)
             }
-            if state.settings.textProvider == .local {
+            if textRunner.wrappedValue == .builtIn {
+                LabeledContent("Status", value: state.textEngineStatus)
+                Text("One model does every text job: cleanup, Command Mode, Transforms and meeting notes.")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(ModelCatalog.gguf) { m in ggufRow(m) }
+            } else if state.settings.textProvider == .local {
                 roleRow(.cleanup, binding: $state.settings.ollamaModel, allowBlank: false)
                 roleRow(.commands, binding: $state.settings.commandModel, allowBlank: true)
                 roleRow(.meetings, binding: $state.settings.meetingModel, allowBlank: true)
@@ -216,12 +265,13 @@ struct LabSection: View {
                  ? "Runs Quoth's test sentences (fillers, corrections, lists, questions it must not answer…) through each model with the real cleanup rules, plus your latest dictations."
                  : "Transcribes three short test recordings with known text, plus your latest dictations, with each model.")
                 .font(.caption).foregroundStyle(.secondary)
-            let options = kind == 0 ? installedText + (Keychain.apiKey() != nil ? ["cloud"] : [])
+            let builtIn = state.textEngineStatus == "Ready" ? ["builtin"] : []
+            let options = kind == 0 ? builtIn + installedText + (Keychain.apiKey() != nil ? ["cloud"] : [])
                                     : ModelCatalog.speech.filter { ModelCatalog.isInstalled($0) }.map(\.file)
             ForEach(options, id: \.self) { m in
                 Toggle(isOn: Binding(get: { picked.contains(m) }, set: { on in
                     if on { if picked.count < 3 { picked.insert(m) } } else { picked.remove(m) }
-                })) { Text(m == "cloud" ? "Cloud: \(state.settings.cloudLLMModel)" : (ModelCatalog.speech.first { $0.file == m }?.name ?? m)) }
+                })) { Text(optionLabel(m)) }
             }
             if kind == 0 { Toggle("Quick run (about 20 sentences, one or two per behaviour)", isOn: $quick) }
             Toggle("Include my recent dictations", isOn: $includeRecent)
@@ -238,6 +288,14 @@ struct LabSection: View {
             }
             if kind == 0 && !lab.cleanup.isEmpty { cleanupResults }
             if kind == 1 && !lab.speech.isEmpty { speechResults }
+        }
+    }
+
+    private func optionLabel(_ m: String) -> String {
+        switch m {
+        case "cloud": "Cloud: \(state.settings.cloudLLMModel)"
+        case "builtin": "Built in: \(ModelCatalog.ggufInfo(forPath: state.settings.llamaModelPath)?.name ?? "model")"
+        default: ModelCatalog.speech.first { $0.file == m }?.name ?? (installedText.contains(m) ? "Ollama: \(m)" : m)
         }
     }
 

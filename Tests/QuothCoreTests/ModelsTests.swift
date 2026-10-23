@@ -14,6 +14,44 @@ import Testing
         #expect(ModelCatalog.recommendedTextModel(ramGB: 8) == "qwen2.5:3b-instruct")
     }
 
+    @Test func ggufCatalogAndBuiltInEngine() throws {
+        let files = ModelCatalog.gguf.map(\.file)
+        #expect(Set(files).count == files.count)
+        #expect(ModelCatalog.gguf.allSatisfy { m in
+            m.file.hasSuffix(".gguf") && m.sha256.count == 64 && m.sha256.allSatisfy(\.isHexDigit) && m.bytes > 1_000_000_000
+                && m.url.absoluteString == "https://huggingface.co/\(m.repo)/resolve/main/\(m.file)"
+        })
+        // Licences suitable for a free app that might one day be paid: no non-commercial models in the built-in list.
+        #expect(ModelCatalog.gguf.allSatisfy { $0.license == "Apache-2.0" })
+
+        // A fresh install uses the built-in engine with the default GGUF…
+        let fresh = Settings()
+        #expect(fresh.localTextEngine == .builtIn)
+        #expect(ModelCatalog.ggufInfo(forPath: fresh.llamaModelPath) == ModelCatalog.defaultGGUF)
+        #expect(fresh.textModelName == "Qwen 2.5 14B")
+        // …but a settings file from before the built-in engine keeps using Ollama.
+        let legacy = try JSONDecoder().decode(Settings.self, from: Data(#"{"textProvider":"local","ollamaModel":"qwen2.5:7b-instruct"}"#.utf8))
+        #expect(legacy.localTextEngine == .ollama)
+        #expect(legacy.textModelName == "qwen2.5:7b-instruct")
+        // Round-trip keeps the choice.
+        var s = Settings()
+        s.localTextEngine = .builtIn; s.llamaModelPath = "/x/Qwen2.5-7B-Instruct-Q4_K_M.gguf"; s.llamaPort = 9000
+        let back = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(s))
+        #expect(back.localTextEngine == .builtIn && back.llamaPort == 9000 && back.textModelName == "Qwen 2.5 7B")
+        s.textProvider = .cloud
+        #expect(s.textModelName == s.cloudLLMModel)
+    }
+
+    @Test func llamaServerHelpers() {
+        #expect(LlamaServer.baseURL(port: 8179).absoluteString == "http://127.0.0.1:8179/v1")
+        #expect(LlamaServer.alias(forModelPath: "/a/b/Model-Q4.gguf") == "Model-Q4.gguf")
+        let c = LlamaServer.client(port: 8179, modelPath: "/a/b/Model-Q4.gguf")
+        #expect(c.model == "Model-Q4.gguf" && c.apiKey == nil)
+        let list = #"{"object":"list","data":[{"id":"Model-Q4.gguf","object":"model","owned_by":"llamacpp"}]}"#
+        #expect(LlamaServer.parseModelsList(Data(list.utf8)) == ["Model-Q4.gguf"])
+        #expect(LlamaServer.parseModelsList(Data("not json".utf8)).isEmpty)
+    }
+
     @Test func providerMigrationAndRoles() throws {
         let old = try JSONDecoder().decode(Settings.self, from: Data(#"{"provider":"cloud","ollamaModel":"qwen2.5:7b-instruct"}"#.utf8))
         #expect(old.speechProvider == .cloud && old.textProvider == .cloud && old.provider == .cloud)
@@ -70,5 +108,61 @@ import Testing
         #expect(CleanupCase.load(jsonl: text).count == lines)   // every line is valid
         let samples = SpeechSample.load(dir: url.deletingLastPathComponent().appendingPathComponent("samples"))
         #expect(samples.count == 3)
+    }
+
+    @Test func goldenAnswersAreNotRejected() throws {
+        // Every accepted cleanup in the golden set must pass the answer check, or the pipeline would fall back.
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Evals/cleanup-golden.jsonl")
+        let cases = CleanupCase.load(jsonl: try String(contentsOf: url, encoding: .utf8))
+        for c in cases where c.snippets == nil && c.replacements == nil {
+            for good in c.accepted {
+                #expect(!OutputSanitizer.looksLikeAnswer(good, raw: c.raw), "\(c.id): \(good)")
+            }
+        }
+    }
+}
+
+@Suite struct DiagnosticsTests {
+    func input(_ s: Settings = Settings(), logs: [(name: String, text: String)] = []) -> DiagnosticsInput {
+        DiagnosticsInput(appVersion: "0.4.0 (7)", macOS: "26.1", hardware: "Mac14,5", ramGB: 16, freeDiskBytes: 50_000_000_000,
+                         settings: s, speechStatus: "Ready", textStatus: "Loading model…",
+                         permissions: [("Microphone", true), ("Accessibility", false)], downloads: [], logs: logs)
+    }
+
+    @Test func reportHasTheFactsAndNoPersonalData() {
+        var s = Settings()
+        s.use(.standard, in: URL(fileURLWithPath: "/Users/someone/Library/Application Support/Quoth/models"))
+        s.cloudBaseURL = "https://api.groq.com/openai/v1"
+        let log = """
+        whisper_init: loading model from '/Users/someone/Library/Application Support/Quoth/models/x.bin'
+        transcript: please send the contract to Alex
+        error: failed to open /Users/someone/Library/Application Support/Quoth/models/x.bin
+        """
+        let r = Diagnostics.report(input(s, logs: [("whisper-server.log", log), ("llama-server.log", "all good\n")]), home: "/Users/someone")
+        #expect(r.contains("Quoth 0.4.0 (7) · macOS 26.1 · Mac14,5 · 16 GB"))
+        #expect(r.contains("Text: this Mac (built in), Qwen2.5-7B-Instruct-Q4_K_M.gguf (Loading model…)"))
+        #expect(r.contains("Accessibility NO"))
+        #expect(r.contains("error: failed to open ~/Library"))
+        #expect(r.contains("llama-server.log: no errors"))
+        // Only error lines from logs, and never the home folder (user name) or anything dictated.
+        #expect(!r.contains("someone"))
+        #expect(!r.contains("contract"))
+        #expect(!r.contains("loading model from"))
+    }
+
+    @Test func cloudShowsOnlyTheHost() {
+        var s = Settings()
+        s.provider = .cloud
+        s.cloudBaseURL = "https://my-private-server.example/v1/secret-path"
+        let r = Diagnostics.report(input(s))
+        #expect(r.contains("my-private-server.example") && !r.contains("secret-path"))
+        #expect(r.contains("Missing models: none"))
+    }
+
+    @Test func logFilterKeepsTheLastErrors() {
+        let log = (1...30).map { "line \($0) error code \($0)" }.joined(separator: "\n") + "\nprocessing ok"
+        let kept = Diagnostics.relevantLines(log, limit: 5)
+        #expect(kept.count == 5 && kept.last == "line 30 error code 30")
+        #expect(Diagnostics.relevantLines("terror is not a match\nwarning: low memory") == ["warning: low memory"])
     }
 }
