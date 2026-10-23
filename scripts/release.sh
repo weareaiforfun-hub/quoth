@@ -51,12 +51,20 @@ OUT="build/release"
 DMG="$OUT/Quoth-$VERSION.dmg"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
+# mktemp makes a private (700) folder, and the DMG's top level inherits it: on any account but the
+# one that built it, the opened DMG would then show an empty window. Readable by everyone.
+chmod 755 "$STAGE"
 mkdir -p "$OUT"
 rm -f "$DMG" "$DMG.sha256"
 ditto "$APP" "$STAGE/Quoth.app"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -quiet -volname "Quoth" -srcfolder "$STAGE" -fs HFS+ -format UDZO -imagekey zlib-level=9 "$DMG"
 hdiutil verify -quiet "$DMG"
+MNT="$(mktemp -d)"
+hdiutil attach -quiet -nobrowse -readonly -mountpoint "$MNT" "$DMG"
+root_mode="$(stat -f %Lp "$MNT")"; app_mode="$(stat -f %Lp "$MNT/Quoth.app")"
+hdiutil detach -quiet "$MNT"; rmdir "$MNT"
+[ "$root_mode" = 755 ] && [ "$app_mode" = 755 ] || fail "DMG contents aren't readable by every user (top $root_mode, app $app_mode)"
 (cd "$OUT" && shasum -a 256 "Quoth-$VERSION.dmg" > "Quoth-$VERSION.dmg.sha256")
 # The same file under a fixed name, for the README's ".../releases/latest/download/Quoth.dmg" link.
 cp -f "$DMG" "$OUT/Quoth.dmg"
