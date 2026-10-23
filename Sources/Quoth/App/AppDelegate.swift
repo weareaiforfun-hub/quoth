@@ -239,6 +239,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 try? url.absoluteString.write(to: AppPaths.support.appendingPathComponent("feedback-url.txt"), atomically: true, encoding: .utf8)
             }
         }
+        // "email": the Email the Developer menu item
+        center.addObserver(forName: .init("app.quoth.debug.email"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if let self { DiagnosticsCollector.emailDeveloper(state: self.state) } }
+        }
         // "diagnostics": what Copy Diagnostics would copy → diagnostics.txt
         center.addObserver(forName: .init("app.quoth.debug.diagnostics"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
