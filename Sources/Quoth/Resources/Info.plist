@@ -12,7 +12,7 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><false/>
     <key>SUFeedURL</key><string>https://github.com/weareaiforfun-hub/quoth/releases/latest/download/appcast.xml</string>
-    <key>SUPublicEDKey</key><string></string>
+    <key>SUPublicEDKey</key><string>jJKJH1Jc5VK6ULU+LaKSRloSB7SvgolmxZqju9sdL/k=</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
     <key>NSHighResolutionCapable</key><true/>
