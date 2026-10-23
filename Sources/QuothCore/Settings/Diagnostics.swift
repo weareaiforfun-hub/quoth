@@ -73,3 +73,36 @@ public enum Diagnostics {
     static func file(_ path: String) -> String { (path as NSString).lastPathComponent }
     static func host(_ url: String) -> String { URL(string: url)?.host ?? "custom server" }
 }
+
+/// "Email the Developer": a new message in the user's mail app, with the diagnostics already in it.
+/// Nothing is sent until the user presses Send.
+public enum Feedback {
+    public static let address = "arian.shafa.analytics@gmail.com"
+    public static let subject = "Quoth feedback"
+
+    public static func body(diagnostics: String, limit: Int = 6000) -> String {
+        let details = diagnostics.count > limit ? String(diagnostics.prefix(limit)) + "\n…" : diagnostics
+        return """
+        Hi,
+
+        (Write your message here. A screenshot helps: press ⌘⇧4, then drag the picture into this email.)
+
+
+
+        --- Technical details, added by Quoth. They never include what you dictated or your user name. ---
+        \(details)
+        """
+    }
+
+    public static func mailURL(diagnostics: String) -> URL? {
+        var c = URLComponents()
+        c.scheme = "mailto"
+        c.path = address
+        c.queryItems = [URLQueryItem(name: "subject", value: subject), URLQueryItem(name: "body", value: body(diagnostics: diagnostics))]
+        // URLComponents leaves "+" and "&"-like characters that mail apps misread; encode strictly.
+        c.percentEncodedQuery = c.queryItems?.map { item in
+            "\(item.name)=\(item.value?.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")"
+        }.joined(separator: "&")
+        return c.url
+    }
+}

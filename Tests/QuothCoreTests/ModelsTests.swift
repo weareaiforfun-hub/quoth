@@ -165,4 +165,16 @@ import Testing
         #expect(kept.count == 5 && kept.last == "line 30 error code 30")
         #expect(Diagnostics.relevantLines("terror is not a match\nwarning: low memory") == ["warning: low memory"])
     }
+
+    @Test func feedbackEmailCarriesTheDiagnostics() throws {
+        let diag = "Quoth 0.4.1 (20) · macOS 26.1\nText: this Mac & co + more"
+        let url = try #require(Feedback.mailURL(diagnostics: diag))
+        #expect(url.absoluteString.hasPrefix("mailto:arian.shafa.analytics@gmail.com?subject=Quoth%20feedback&body="))
+        // A mail app decodes it back to exactly the body, including "&" and "+".
+        let body = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "body" }?.value)
+        #expect(body == Feedback.body(diagnostics: diag))
+        #expect(body.contains("this Mac & co + more"))
+        // Very long diagnostics are cut, so the link stays a size every mail app accepts.
+        #expect(Feedback.body(diagnostics: String(repeating: "x", count: 20_000)).count < 6500)
+    }
 }
