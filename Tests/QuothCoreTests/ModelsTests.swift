@@ -121,3 +121,48 @@ import Testing
         }
     }
 }
+
+@Suite struct DiagnosticsTests {
+    func input(_ s: Settings = Settings(), logs: [(name: String, text: String)] = []) -> DiagnosticsInput {
+        DiagnosticsInput(appVersion: "0.4.0 (7)", macOS: "26.1", hardware: "Mac14,5", ramGB: 16, freeDiskBytes: 50_000_000_000,
+                         settings: s, speechStatus: "Ready", textStatus: "Loading model…",
+                         permissions: [("Microphone", true), ("Accessibility", false)], downloads: [], logs: logs)
+    }
+
+    @Test func reportHasTheFactsAndNoPersonalData() {
+        var s = Settings()
+        s.use(.standard, in: URL(fileURLWithPath: "/Users/someone/Library/Application Support/Quoth/models"))
+        s.cloudBaseURL = "https://api.groq.com/openai/v1"
+        let log = """
+        whisper_init: loading model from '/Users/someone/Library/Application Support/Quoth/models/x.bin'
+        transcript: please send the contract to Alex
+        error: failed to open /Users/someone/Library/Application Support/Quoth/models/x.bin
+        """
+        let r = Diagnostics.report(input(s, logs: [("whisper-server.log", log), ("llama-server.log", "all good\n")]), home: "/Users/someone")
+        #expect(r.contains("Quoth 0.4.0 (7) · macOS 26.1 · Mac14,5 · 16 GB"))
+        #expect(r.contains("Text: this Mac (built in), Qwen2.5-7B-Instruct-Q4_K_M.gguf (Loading model…)"))
+        #expect(r.contains("Accessibility NO"))
+        #expect(r.contains("error: failed to open ~/Library"))
+        #expect(r.contains("llama-server.log: no errors"))
+        // Only error lines from logs, and never the home folder (user name) or anything dictated.
+        #expect(!r.contains("someone"))
+        #expect(!r.contains("contract"))
+        #expect(!r.contains("loading model from"))
+    }
+
+    @Test func cloudShowsOnlyTheHost() {
+        var s = Settings()
+        s.provider = .cloud
+        s.cloudBaseURL = "https://my-private-server.example/v1/secret-path"
+        let r = Diagnostics.report(input(s))
+        #expect(r.contains("my-private-server.example") && !r.contains("secret-path"))
+        #expect(r.contains("Missing models: none"))
+    }
+
+    @Test func logFilterKeepsTheLastErrors() {
+        let log = (1...30).map { "line \($0) error code \($0)" }.joined(separator: "\n") + "\nprocessing ok"
+        let kept = Diagnostics.relevantLines(log, limit: 5)
+        #expect(kept.count == 5 && kept.last == "line 30 error code 30")
+        #expect(Diagnostics.relevantLines("terror is not a match\nwarning: low memory") == ["warning: low memory"])
+    }
+}

@@ -85,6 +85,7 @@ The [User guide](user-guide.md) covers everything else.
 | The emoji picker opens | Set "Press 🌐 key to" → Do Nothing, or switch the hotkey to Right Option. |
 | "Speech model: model missing" in the menu | Run `scripts/setup.sh` again, or download a model in Quoth → Models. |
 | Text appears but isn't cleaned up ("cleanup skipped") | The language model isn't downloaded or is still loading (Quoth → Models shows its status; details in `llama-server.log`). If you chose Ollama, it isn't running (`brew services start ollama`). Very long dictations get more time automatically. |
+| Something else is wrong | Quoth → Settings → Help → **Report a Problem…** opens a GitHub issue and copies diagnostics (versions, settings, engine errors; never what you dictated) for you to paste. |
 | It's slow | Pin your language (Settings), choose a smaller language model (Models → Dictation cleanup), or use a cloud API. |
 | Text goes to the wrong place | Quoth pastes where the cursor is when you **start** speaking. Click into the field first. |
 | "Won't type into password fields" | That's intentional. |

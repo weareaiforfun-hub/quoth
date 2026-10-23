@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         controller = DictationController(state: state, hotkeys: hotkeys, earshot: earshot)
         earshot.onOpenHub = { [weak self] in self?.openHub() }
         controller.onScratchpad = { [weak self] in self?.scratchpad.toggle() }
+        controller.onNeedsSetup = { [weak self] in self?.openHub() }
         meetings = MeetingController(state: state, dictation: controller)
         meetings.onMessage = { [weak self] text, isError in self?.controller.showMessage(text, isError: isError) }
         meetings.onChange = { [weak self] in self?.updateStatusIcon() }
@@ -229,6 +230,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 u.automaticallyChecksForUpdates = true
                 u.automaticallyDownloadsUpdates = true
                 u.checkForUpdatesInBackground()
+            }
+        }
+        // "diagnostics": what Copy Diagnostics would copy → diagnostics.txt
+        center.addObserver(forName: .init("app.quoth.debug.diagnostics"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                try? DiagnosticsCollector.report(state: self.state)
+                    .write(to: AppPaths.support.appendingPathComponent("diagnostics.txt"), atomically: true, encoding: .utf8)
             }
         }
         // "quit": a normal quit, as from the menu (Sparkle installs a downloaded update then).

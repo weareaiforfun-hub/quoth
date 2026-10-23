@@ -239,6 +239,7 @@ struct SettingsView: View {
                 Button("Reveal data folder") { NSWorkspace.shared.open(AppPaths.support) }
             }
             UpdatesSection()
+            HelpSection(state: state)
         }
         .formStyle(.grouped)
         .onAppear { mics = MicrophoneManager.inputDevices() }
@@ -379,6 +380,27 @@ struct UpdatesSection: View {
             } else {
                 Text("Updates aren't available in development builds.").font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// Settings → Help: diagnostics for support, without anything you dictated.
+struct HelpSection: View {
+    @ObservedObject var state: AppState
+    @State private var copied = false
+
+    var body: some View {
+        Section("Help") {
+            HStack {
+                Button(copied ? "Copied" : "Copy Diagnostics") {
+                    DiagnosticsCollector.copy(state: state)
+                    copied = true
+                    Task { try? await Task.sleep(nanoseconds: 2_000_000_000); copied = false }
+                }
+                Button("Report a Problem…") { DiagnosticsCollector.reportProblem(state: state) }
+            }
+            Text("Diagnostics list Quoth's version, your Mac model and macOS version, settings, permissions, and recent engine errors. They never include what you dictated, your dictionary or notes, or your user name. Report a Problem copies them and opens a new issue on GitHub (a free GitHub account is needed) for you to fill in.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }
