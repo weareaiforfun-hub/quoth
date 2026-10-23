@@ -31,10 +31,14 @@ Quoth is an independent open-source project and isn't affiliated with any commer
 <p align="center"><a href="https://github.com/weareaiforfun-hub/quoth/releases/latest/download/Quoth.dmg"><b>⬇ Download Quoth for Mac</b></a><br>
 <sub>Free · Apple Silicon (M1 or later) · macOS 14 or later · <a href="https://github.com/weareaiforfun-hub/quoth/releases/latest">release notes</a></sub></p>
 
+**New to this? Follow the [step-by-step install guide](docs/install.md).** In short:
+
 1. Open the downloaded **Quoth.dmg** and drag **Quoth** onto **Applications**.
-2. Open Quoth. The first time, macOS says it can't check Quoth for malicious software, because this free project isn't registered with Apple ($99 a year). Click **Done**.
-3. Open **System Settings → Privacy & Security**, scroll to **Security**, click **Open Anyway** next to "Quoth was blocked", and confirm with your password. You only do this once; updates install by themselves.
-4. On the **Setup** page, download the AI models (the right size for your Mac is preselected) and grant the permissions. Then hold **Fn** and talk.
+2. Open Quoth. macOS blocks it the first time: click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll down to **Security**, click **Open Anyway** next to "Quoth was blocked", and confirm with your password. You only do this once; updates open normally.
+4. On the **Setup** page, download the AI models (the right size for your Mac is preselected) and grant the three permissions. Then hold **Fn** and talk.
+
+**Why the extra step?** Apple charges developers a yearly fee (€99 every year) before macOS opens their apps without asking. To keep Quoth free without paying that fee, I publish it a different way: signed with the project's own certificate instead of Apple's. The code is open, and every update is signed and checked. [More in the install guide](docs/install.md#why-theres-one-extra-step).
 
 **Memory:** 8 GB Macs get the Lite models; 16 GB, Standard; 32 GB or more, Best. **Disk:** 3–10 GB for the models. A cloud API works too, with your own key.
 
@@ -54,7 +58,8 @@ Then follow **[Getting started](docs/getting-started.md)**: grant three permissi
 
 | Guide | For |
 | --- | --- |
-| [Getting started](docs/getting-started.md) | New users: installation, permissions, first dictation, troubleshooting |
+| [Install](docs/install.md) | Everyone: download, the one-time "Open Anyway" step, setup, first dictation |
+| [Getting started](docs/getting-started.md) | Building from source, permissions, troubleshooting |
 | [User guide](docs/user-guide.md) | Every feature and shortcut |
 | [Models](docs/models.md) | Which model does what, how to switch, how to compare |
 | [Privacy](docs/privacy.md) | What's stored, what's read, what leaves your Mac |

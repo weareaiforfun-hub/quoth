@@ -1,6 +1,8 @@
 # Getting started
 
-This guide takes you from nothing to your first dictation in about 15 minutes, most of it waiting for downloads.
+**Just want to use Quoth?** Follow the [install guide](install.md) instead: download, open, done. No Terminal needed.
+
+This guide is for building Quoth from source. It takes you from nothing to your first dictation in about 15 minutes, most of it waiting for downloads.
 
 ## 1. Check your Mac
 
