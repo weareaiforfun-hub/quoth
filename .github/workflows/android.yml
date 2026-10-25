@@ -24,6 +24,6 @@ jobs:
       - name: Fetch engine sources
         run: scripts/fetch-engines.sh
       - name: Core unit tests
-        run: ./gradlew :core:test --console=plain
+        run: ./gradlew :core:test :core:compileEvalKotlin --console=plain
       - name: Build the app (debug APK)
         run: ./gradlew :app:assembleDebug --console=plain

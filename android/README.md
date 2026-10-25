@@ -8,7 +8,7 @@ so the text is Whisper's, with the Mac app's spoken-punctuation rules applied.
 
 | Module | What |
 | --- | --- |
-| `core/` | Platform-neutral Kotlin (no Android): model downloads, and ports of the Mac's rules from `Sources/QuothCore`. Tests run on the JVM |
+| `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
 | `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (setup), `WhisperEngine` + `src/main/cpp` (JNI bridge to whisper.cpp) |
 | `scripts/` | `fetch-engines.sh` (pinned whisper.cpp source), `e2e-emulator.sh` (end-to-end check) |
 
@@ -35,6 +35,17 @@ The script dictates `say`-generated speech through a debug-only hook: in debug b
 `files/debug-input.wav` exists in the app's storage, the keyboard transcribes it instead of the microphone. The same script runs on a phone with USB debugging;
 keep it unlocked with the screen on (a sleeping phone runs whisper over ten times slower).
 
+## Evals
+
+`core` runs the same golden cases as the Mac (`Evals/cleanup-golden.jsonl`) against any OpenAI-compatible server,
+normally a `llama-server` on the Mac. To compare with the Swift version, point both at the same server:
+
+```bash
+/Applications/Quoth.app/Contents/MacOS/llama-server -m <model.gguf> --port 8190 --alias <model.gguf> -c 16384 -np 1 -ngl 999 --no-webui --reasoning off &
+./gradlew :core:eval --args="--port 8190 --verbose"
+(cd .. && swift run quoth-eval --builtin --port 8190 --gguf <model.gguf> --verbose)
+```
+
 ## Notes
 
 - arm64 only, Android 10 (API 29) or newer. Native code is built for `armv8.2-a+dotprod+fp16` and 16 KB pages.
@@ -42,3 +53,4 @@ keep it unlocked with the screen on (a sleeping phone runs whisper over ten time
 - Pixel 9a (Tensor G4), base model: about 2.4 s per dictation whatever its length, since whisper always encodes a
   30 s window. 4 threads is fastest; q5_1/q8_0 models are no faster, and a shortened `audio_ctx` is 3–4× faster
   but drops or garbles words, so neither is used.
+- Kotlin regexes go through `Rx` (Text.kt) so `\b`, `\w` and `\s` are Unicode-aware on the JVM as on Android and the Mac.
