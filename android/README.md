@@ -32,9 +32,13 @@ scripts/e2e-emulator.sh
 ```
 
 The script dictates `say`-generated speech through a debug-only hook: in debug builds, if
-`files/debug-input.wav` exists in the app's storage, the keyboard transcribes it instead of the microphone.
+`files/debug-input.wav` exists in the app's storage, the keyboard transcribes it instead of the microphone. The same script runs on a phone with USB debugging;
+keep it unlocked with the screen on (a sleeping phone runs whisper over ten times slower).
 
 ## Notes
 
 - arm64 only, Android 10 (API 29) or newer. Native code is built for `armv8.2-a+dotprod+fp16` and 16 KB pages.
 - Force-stopping the app makes Android fall back to another keyboard; ordinary updates keep Quoth selected.
+- Pixel 9a (Tensor G4), base model: about 2.4 s per dictation whatever its length, since whisper always encodes a
+  30 s window. 4 threads is fastest; q5_1/q8_0 models are no faster, and a shortened `audio_ctx` is 3–4× faster
+  but drops or garbles words, so neither is used.

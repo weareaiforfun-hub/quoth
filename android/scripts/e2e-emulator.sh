@@ -1,5 +1,5 @@
 #!/bin/bash
-# End-to-end check of the Quoth keyboard on a running emulator (or a phone with USB debugging):
+# End-to-end check of the Quoth keyboard on a running emulator, or a phone with USB debugging (unlocked, screen on):
 # installs the debug APK, enables the keyboard, then dictates `say`-generated speech into the
 # setup screen's "Try it here" box through the debug-input hook, and checks the text that lands.
 #
@@ -110,6 +110,18 @@ read -r x y < <(mic_xy)
 "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 8
 check "silence inserts nothing" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there."
 
+# Password box (the setup screen's debug-only password extra): the mic is off, so nothing is inserted.
+"$ADB" push -q "$WORK/in.wav" /data/local/tmp/in.wav
+"$ADB" shell run-as "$PKG" cp /data/local/tmp/in.wav files/debug-input.wav
+"$ADB" shell am start -f 0x10008000 -n "$PKG/.android.MainActivity" --ez password true >/dev/null
+sleep 3
+ui focus; sleep 2
+"$ADB" logcat -c
+read -r x y < <(mic_xy)
+"$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 5
+if "$ADB" logcat -d -s Quoth | grep -q timing; then echo "FAIL password box (it transcribed)"; fail=$((fail+1)); else check "password box inserts nothing" ""; fi
+
 "$ADB" shell run-as "$PKG" rm -f files/debug-input.wav
+"$ADB" shell rm -f /data/local/tmp/in.wav
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

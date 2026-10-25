@@ -81,6 +81,9 @@ class MainActivity : Activity() {
             gravity = Gravity.TOP
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             contentDescription = "Try it here"
+            // Debug builds only: start with --ez password true to make this a password box (for automated tests).
+            if (BuildConfig.DEBUG && intent.getBooleanExtra("password", false))
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         })
 
         setContentView(ScrollView(this).apply {
