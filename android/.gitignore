@@ -6,3 +6,5 @@ third_party/
 *.keystore
 *.jks
 .cxx/
+eval-*.log
+eval-*.tsv

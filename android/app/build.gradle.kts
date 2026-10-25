@@ -18,6 +18,7 @@ android {
             cmake {
                 arguments += listOf(
                     "-DWHISPER_SRC=${rootProject.file("third_party/whisper.cpp").absolutePath}",
+                    "-DLLAMA_SRC=${rootProject.file("third_party/llama.cpp").absolutePath}",
                     "-DANDROID_STL=c++_static",
                 )
             }

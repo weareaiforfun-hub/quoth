@@ -25,6 +25,11 @@ fun interface Cleaner {
     fun clean(raw: String, level: CleanupLevel, context: CleanupContext): String
 }
 
+/** A cleaner that can be stopped from another thread (an on-device model), so a timed-out cleanup frees the engine. */
+interface Cancellable {
+    fun cancel()
+}
+
 class CleanupTimeoutException : Exception("Timed out")
 
 data class DictationOutcome(
@@ -157,7 +162,9 @@ class DictationPipeline(
         val t1 = System.nanoTime()
         val askedForLines = SpokenPunctuation.applyLineBreaks(raw).contains("\n") || ListDetector.isEnumeration(raw)
         fun attempt(ctx: CleanupContext): String {
-            val out = withTimeout(effectiveTimeout(raw)) { cleaner.clean(SpokenPunctuation.applyLineBreaks(raw), level, ctx) }
+            val out = withTimeout(effectiveTimeout(raw), onTimeout = { (cleaner as? Cancellable)?.cancel() }) {
+                cleaner.clean(SpokenPunctuation.applyLineBreaks(raw), level, ctx)
+            }
             var cleaned = ListDetector.restoreLeadIn(ListDetector.repairNumbering(OutputSanitizer.sanitize(out, raw)), raw)
             if (ctx.category != StyleCategory.EMAIL) cleaned = Greeting.joinOutsideEmail(cleaned)
             if (!askedForLines && ctx.category != StyleCategory.EMAIL && cleaned.contains("\n")) {
@@ -190,12 +197,13 @@ class DictationPipeline(
 
         fun msSince(t: Long) = (System.nanoTime() - t) / 1_000_000
 
-        fun <T> withTimeout(seconds: Double, op: () -> T): T {
+        fun <T> withTimeout(seconds: Double, onTimeout: () -> Unit = {}, op: () -> T): T {
             val future = pool.submit<T> { op() }
             try {
                 return future.get((seconds * 1000).toLong(), TimeUnit.MILLISECONDS)
             } catch (e: TimeoutException) {
                 future.cancel(true)
+                onTimeout()
                 throw CleanupTimeoutException()
             } catch (e: ExecutionException) {
                 throw e.cause as? Exception ?: e

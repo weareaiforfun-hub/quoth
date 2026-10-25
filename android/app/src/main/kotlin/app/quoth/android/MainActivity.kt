@@ -17,19 +17,21 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import app.quoth.core.ModelFile
 import kotlin.concurrent.thread
 
 /** Setup: microphone, speech model, enabling the keyboard, and a box to try it in. */
 class MainActivity : Activity() {
     private lateinit var micStep: Step
     private lateinit var modelStep: Step
+    private lateinit var cleanupStep: Step
     private lateinit var enableStep: Step
     private lateinit var switchStep: Step
-    private lateinit var progress: ProgressBar
-    @Volatile private var downloading = false
+    private val downloading = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG && intent.getBooleanExtra("evals", false)) Speech.runEvals(this)
         val dp = resources.displayMetrics.density
         val pad = (20 * dp).toInt()
 
@@ -52,20 +54,23 @@ class MainActivity : Activity() {
         micStep = Step("1. Allow the microphone", "Allow") {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
-        modelStep = Step("2. Download the speech model (${Speech.model.bytes / 1_000_000} MB)", "Download") { download() }
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 1000
-            visibility = View.GONE
+        modelStep = Step("2. Download the speech model (${Speech.model.bytes / 1_000_000} MB)", "Download") {
+            download(Speech.model, modelStep)
         }
-        enableStep = Step("3. Turn on the Quoth keyboard", "Open settings") {
+        val cleanup = Speech.cleanupModel(this)
+        cleanupStep = Step("3. Download the clean-up model (%.1f GB)".format(cleanup.bytes / 1e9), "Download") {
+            download(cleanup, cleanupStep)
+        }
+        cleanupStep.detail("Optional. Removes ums, applies corrections and fixes punctuation. Best on Wi-Fi.")
+        enableStep = Step("4. Turn on the Quoth keyboard", "Open settings") {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
-        switchStep = Step("4. Switch to Quoth", "Choose keyboard") {
+        switchStep = Step("5. Switch to Quoth", "Choose keyboard") {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
         column.addView(micStep.view)
         column.addView(modelStep.view)
-        column.addView(progress)
+        column.addView(cleanupStep.view)
         column.addView(enableStep.view)
         column.addView(switchStep.view)
 
@@ -112,29 +117,29 @@ class MainActivity : Activity() {
         val ours = imm.enabledInputMethodList.firstOrNull { it.packageName == packageName }
         val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         micStep.done = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (!downloading) modelStep.done = Speech.isModelInstalled(this)
+        if (Speech.model.file !in downloading) modelStep.done = Speech.isModelInstalled(this)
+        if (Speech.cleanupModel(this).file !in downloading) cleanupStep.done = Speech.isCleanupInstalled(this)
         enableStep.done = ours != null
         switchStep.done = ours != null && current == ours.id
     }
 
-    private fun download() {
-        if (downloading) return
-        downloading = true
-        modelStep.button.isEnabled = false
-        modelStep.button.text = "Downloading…"
-        progress.visibility = View.VISIBLE
+    private fun download(model: ModelFile, step: Step) {
+        if (!downloading.add(model.file)) return
+        step.button.isEnabled = false
+        step.button.text = "Downloading…"
+        step.progress.visibility = View.VISIBLE
         thread(name = "quoth-download") {
             val error = runCatching {
-                Speech.downloader(this).download(Speech.model) { have, total ->
-                    runOnUiThread { progress.progress = (have * 1000 / total).toInt() }
+                Speech.downloader(this).download(model) { have, total ->
+                    runOnUiThread { step.progress.progress = (have * 1000 / total).toInt() }
                 }
             }.exceptionOrNull()
             runOnUiThread {
-                downloading = false
-                progress.visibility = View.GONE
-                modelStep.button.isEnabled = true
-                modelStep.button.text = if (error == null) "Download" else "Try again"
-                if (error != null) modelStep.detail("Download stopped: ${error.message}. It will continue where it left off.")
+                downloading.remove(model.file)
+                step.progress.visibility = View.GONE
+                step.button.isEnabled = true
+                step.button.text = if (error == null) "Download" else "Try again"
+                if (error != null) step.detail("Download stopped: ${error.message}. It will continue where it left off.")
                 refresh()
                 if (error == null) Speech.warmUp(this)
             }
@@ -160,6 +165,10 @@ class MainActivity : Activity() {
             setTextColor(GREEN)
             contentDescription = "Done"
         }
+        val progress = ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 1000
+            visibility = View.GONE
+        }
         val button = Button(this@MainActivity).apply {
             text = action
             setOnClickListener { onClick() }
@@ -174,6 +183,7 @@ class MainActivity : Activity() {
                 addView(button)
                 addView(tick)
             })
+            addView(progress)
             addView(note)
         }
 

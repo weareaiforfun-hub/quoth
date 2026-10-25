@@ -18,6 +18,9 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import app.quoth.core.CleanupContext
+import app.quoth.core.PersonalData
+import app.quoth.core.StyleCategory
 
 /**
  * The Quoth keyboard: one big microphone button. Tap to talk, tap again to finish, and the
@@ -136,24 +139,37 @@ class QuothKeyboardService : InputMethodService() {
         busy = true
         refresh()
         status.text = "Writing…"
-        Speech.transcribe(this, samples) { text ->
+        Speech.dictate(this, samples, target()) { outcome ->
             main.post {
                 busy = false
                 when {
-                    text == null -> { refresh(); status.text = "Something went wrong. Try again." }
-                    text.isBlank() -> { refresh(); status.text = "Didn't catch that. Try again." }
-                    else -> { insert(text); refresh() }
+                    outcome == null -> { refresh(); status.text = "Something went wrong. Try again." }
+                    outcome.final.isBlank() -> { refresh(); status.text = "Didn't catch that. Try again." }
+                    else -> { insert(outcome.final); refresh() }
                 }
             }
         }
     }
 
-    /** Inserts text at the cursor, with a space before it when it continues a word. */
+    /** Where the text is going: the app (for its writing style) and the text around the cursor. */
+    private fun target(): CleanupContext {
+        val app = currentInputEditorInfo?.packageName
+        val category = StyleCategory.detect(app, null)
+        val ic = currentInputConnection
+        return CleanupContext(
+            bundleID = app,
+            category = category,
+            tone = PersonalData().styles[category],
+            textBeforeCursor = ic?.getTextBeforeCursor(600, 0)?.toString(),
+            textAfterCursor = ic?.getTextAfterCursor(100, 0)?.toString(),
+            hasSelection = !ic?.getSelectedText(0).isNullOrEmpty(),
+        )
+    }
+
+    /** Inserts the finished text at the cursor; the pipeline has already fitted its spacing and case to the field. */
     private fun insert(text: String) {
         val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        val spaced = if (before.isNotEmpty() && !before.last().isWhitespace()) " $text" else text
-        ic.commitText(spaced, 1)
+        ic.commitText(text, 1)
         Log.i(Speech.TAG, "inserted ${text.length} chars")
     }
 

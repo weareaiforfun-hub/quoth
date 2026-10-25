@@ -1,16 +1,17 @@
 # Quoth for Android
 
 A voice keyboard: tap the microphone, speak, and the text goes into whatever app you're typing in.
-Speech recognition runs on the phone with whisper.cpp. **Work in progress:** there's no cleanup model yet,
-so the text is Whisper's, with the Mac app's spoken-punctuation rules applied.
+Everything runs on the phone: whisper.cpp turns speech into text, then (once its model is downloaded) a small
+language model in llama.cpp cleans it up with the same prompt and rules as the Mac app. Without the cleanup
+model the text is Whisper's, with the Mac app's spoken-punctuation and style rules applied.
 
 ## Layout
 
 | Module | What |
 | --- | --- |
 | `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
-| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (setup), `WhisperEngine` + `src/main/cpp` (JNI bridge to whisper.cpp) |
-| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp source), `e2e-emulator.sh` (end-to-end check) |
+| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (setup), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
+| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone) |
 
 ## Build and test (macOS)
 

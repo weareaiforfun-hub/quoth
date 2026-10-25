@@ -2,7 +2,7 @@ package app.quoth.android
 
 import java.io.File
 
-/** whisper.cpp on the phone's CPU, through libquoth_whisper.so. One instance per loaded model. */
+/** whisper.cpp on the phone's CPU, through libquoth.so. One instance per loaded model. */
 class WhisperEngine private constructor(private var ctx: Long) : AutoCloseable {
 
     /** Transcribes 16 kHz mono samples in [-1, 1]. Blocking: call it off the main thread. */
@@ -20,14 +20,14 @@ class WhisperEngine private constructor(private var ctx: Long) : AutoCloseable {
     }
 
     companion object {
-        init { System.loadLibrary("quoth_whisper") }
+        init { System.loadLibrary("quoth") }
 
         fun load(model: File): WhisperEngine? = nativeInit(model.absolutePath).takeIf { it != 0L }?.let(::WhisperEngine)
 
         val systemInfo: String get() = nativeSystemInfo()
 
         /** Big cores only: phones have 2–4 fast cores, and spreading onto the slow ones makes whisper slower. */
-        private fun threads() = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+        fun threads() = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
 
         @JvmStatic private external fun nativeInit(modelPath: String): Long
         @JvmStatic private external fun nativeFree(ctx: Long)

@@ -19,6 +19,26 @@ object ModelCatalog {
         "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", WHISPER + "ggml-small.bin")
 
     val speech = listOf(whisperBase, whisperSmall)
+
+    private fun gguf(repo: String, file: String) = "https://huggingface.co/$repo/resolve/main/$file"
+
+    // Cleanup models for llama.cpp (Q4_K_M, all Apache-2.0). Scores are the golden evals
+    // (Evals/cleanup-golden.jsonl, 66 cases: exact / same words / hard failures), run on the Mac's llama-server.
+    /** 52 / 61 / 0: the best small model tested, better than the Mac's Lite model. */
+    val qwen35_4b = ModelFile("Qwen_Qwen3.5-4B-Q4_K_M.gguf", "Qwen 3.5 4B", 3_013_027_808,
+        "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983", gguf("bartowski/Qwen_Qwen3.5-4B-GGUF", "Qwen_Qwen3.5-4B-Q4_K_M.gguf"))
+    /** 49 / 59 / 0: the Mac's Lite model. */
+    val qwen3_4b = ModelFile("Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf", "Qwen 3 4B", 2_497_280_736,
+        "2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e",
+        gguf("bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF", "Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf"))
+    /** 29 / 54 / 1. */
+    val qwen3_1_7b = ModelFile("Qwen_Qwen3-1.7B-Q4_K_M.gguf", "Qwen 3 1.7B", 1_282_439_584,
+        "72c5c3cb38fa32d5256e2fe30d03e7a64c6c79e668ad84057e3bd66e250b24fb", gguf("bartowski/Qwen_Qwen3-1.7B-GGUF", "Qwen_Qwen3-1.7B-Q4_K_M.gguf"))
+    /** 25 / 47 / 0. */
+    val qwen35_2b = ModelFile("Qwen_Qwen3.5-2B-Q4_K_M.gguf", "Qwen 3.5 2B", 1_396_198_496,
+        "57a1085840f497d764a7fc5d346922dbde961efb54cc792ea81d694fd846a1d8", gguf("bartowski/Qwen_Qwen3.5-2B-GGUF", "Qwen_Qwen3.5-2B-Q4_K_M.gguf"))
+
+    val cleanup = listOf(qwen35_4b, qwen3_4b, qwen3_1_7b, qwen35_2b)
 }
 
 /**

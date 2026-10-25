@@ -1,10 +1,11 @@
 #!/bin/bash
 # Fetches the pinned engine sources that the Android app compiles with the NDK.
-# whisper.cpp (MIT) goes to third_party/, which git ignores. Re-running is a no-op.
+# whisper.cpp and llama.cpp (both MIT) go to third_party/, which git ignores. Re-running is a no-op.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 WHISPER_TAG="v1.9.5"
+LLAMA_TAG="v0.7.0"   # the same tags as the Mac app (scripts/build-engines.sh)
 
 fetch() { # repo tag dir
   if [ ! -d "$3/.git" ]; then
@@ -17,4 +18,5 @@ fetch() { # repo tag dir
 
 mkdir -p third_party
 fetch https://github.com/ggml-org/whisper.cpp "$WHISPER_TAG" third_party/whisper.cpp
-echo "whisper.cpp $WHISPER_TAG in third_party/whisper.cpp"
+fetch https://github.com/ggml-org/llama.cpp "$LLAMA_TAG" third_party/llama.cpp
+echo "whisper.cpp $WHISPER_TAG and llama.cpp $LLAMA_TAG in third_party/"
