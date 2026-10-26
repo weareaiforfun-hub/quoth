@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Only for downloading the models. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:label="Quoth"
+        android:icon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".HistoryScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".DictionaryScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SnippetsScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".StyleScreen" android:exported="false" />
+        <activity android:name=".SettingsScreen" android:exported="false" />
+        <activity android:name=".ModelsScreen" android:exported="false" />
+
+        <service
+            android:name=".QuothKeyboardService"
+            android:exported="true"
+            android:label="Quoth voice keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+        </service>
+    </application>
+</manifest>

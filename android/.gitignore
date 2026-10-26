@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+third_party/
+.kotlin/
+*.keystore
+*.jks
+.cxx/
+eval-*.log
+eval-*.tsv
