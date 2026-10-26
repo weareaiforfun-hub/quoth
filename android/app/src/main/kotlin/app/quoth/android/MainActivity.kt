@@ -154,6 +154,10 @@ class MainActivity : Activity() {
             }
         }
         enableStep.done = ours != null
+        if (!enableStep.done) {
+            enableStep.detail("Android warns that a keyboard may collect what you type. Quoth reads only a little text around " +
+                "the cursor while you dictate, to fit the new words in, and it never leaves this phone.")
+        }
         switchStep.done = ours != null && current == ours.id
         // Once everything needed is done, setup folds away (the optional clean-up step stays until it's downloaded).
         val essentials = micStep.done && modelStep.done && enableStep.done && switchStep.done

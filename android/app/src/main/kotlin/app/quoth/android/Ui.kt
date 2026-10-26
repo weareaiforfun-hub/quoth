@@ -101,10 +101,19 @@ object Ui {
 
     /** Pads a full-screen view clear of the status bar, the navigation bar and the on-screen keyboard. */
     fun fitSystemBars(view: View, base: Int) {
+        // Android 10 draws below the bars and may never call the listener, so start with the plain margin.
+        view.setPadding(base, base, base, base)
         view.setOnApplyWindowInsetsListener { v, insets ->
-            val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            val ime = insets.getInsets(WindowInsets.Type.ime())
-            v.setPadding(base + bars.left, base + bars.top, base + bars.right, base + maxOf(bars.bottom, ime.bottom))
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                val ime = insets.getInsets(WindowInsets.Type.ime())
+                v.setPadding(base + bars.left, base + bars.top, base + bars.right, base + maxOf(bars.bottom, ime.bottom))
+            } else {
+                // Android 10: no inset types yet (and adjustResize already makes room for the keyboard).
+                @Suppress("DEPRECATION")
+                v.setPadding(base + insets.systemWindowInsetLeft, base + insets.systemWindowInsetTop,
+                    base + insets.systemWindowInsetRight, base + insets.systemWindowInsetBottom)
+            }
             insets
         }
     }

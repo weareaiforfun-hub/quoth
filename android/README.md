@@ -11,7 +11,7 @@ model the text is Whisper's, with the Mac app's spoken-punctuation and style rul
 | --- | --- |
 | `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
 | `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (home: setup, try-it box, links to the screens), `PersonalScreens.kt` (History, Dictionary, Snippets, Style), `SettingsScreens.kt` (Settings, Models), `Store` (settings.json, personal.json, history.json in the app's files), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
-| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone), `make-wordlist.py` (auto-learn's word list) |
+| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone), `make-wordlist.py` (auto-learn's word list), `store-assets.swift` and `store-screenshots.sh` (Play Store graphics) |
 
 ## Build and test (macOS)
 
@@ -66,3 +66,6 @@ normally a `llama-server` on the Mac. To compare with the Swift version, point b
   search, address and subject fields also lose the final period. Fields flagged `IME_FLAG_NO_PERSONALIZED_LEARNING`
   (incognito tabs) are left out of History and auto-learn.
 - The e2e script backs up and restores `personal.json` and `history.json`.
+- Releasing on Google Play: `docs/android-release.md` (upload key, signing file, closed test). Store texts and form answers
+  are in `store/`. `./gradlew :app:lintRelease` must report no errors (it caught Android 10 crashes from API 30 inset calls).
+- Android 10 is checked on a second emulator: `avdmanager create avd -n quoth-api29 -k "system-images;android-29;google_apis;arm64-v8a" -d pixel_4`.

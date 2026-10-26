@@ -7,8 +7,9 @@
 
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="Quoth"
-        android:icon="@drawable/ic_quoth"
+        android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 

@@ -82,7 +82,9 @@ class QuothKeyboardService : InputMethodService() {
             setPadding(pad, pad / 2, pad, pad)
             // Keep the keys clear of the gesture bar / navigation buttons (keyboards draw edge to edge).
             setOnApplyWindowInsetsListener { v, insets ->
-                val bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                @Suppress("DEPRECATION")
+                val bottom = if (android.os.Build.VERSION.SDK_INT >= 30) insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                    else insets.systemWindowInsetBottom
                 v.setPadding(pad, pad / 2, pad, pad + bottom)
                 insets
             }
