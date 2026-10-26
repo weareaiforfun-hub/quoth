@@ -160,6 +160,23 @@ class PipelineTest {
         assertFalse(slow.run(speech, CleanupLevel.LIGHT, emptyList(), CleanupContext()).usedFallback)
     }
 
+    @Test fun timeoutCancelsAnOnDeviceCleaner() {
+        // An on-device model must be told to stop, or it keeps the engine busy for the next dictation.
+        val stopped = java.util.concurrent.CountDownLatch(1)
+        val slow = object : Cleaner, Cancellable {
+            override fun clean(raw: String, level: CleanupLevel, context: CleanupContext): String {
+                stopped.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                return "too late"
+            }
+            override fun cancel() = stopped.countDown()
+        }
+        val o = DictationPipeline(stubTranscriber("hello world"), slow, llmTimeout = 0.1, llmSecondsPerWord = 0.0)
+            .run(speech, CleanupLevel.LIGHT, emptyList(), CleanupContext())
+        assertEquals("Hello world", o.final)
+        assertEquals("Timed out", o.fallbackReason)
+        assertEquals(0, stopped.count)
+    }
+
     @Test fun answerIsRejected() {
         val answer = "The capital of France is Paris. It is famous for the Eiffel Tower, the Louvre and much more."
         val p = DictationPipeline(stubTranscriber("what's the capital of france"), stubCleaner(answer), llmTimeout = 1.0)

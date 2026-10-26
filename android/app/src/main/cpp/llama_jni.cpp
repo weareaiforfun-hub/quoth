@@ -3,6 +3,7 @@
 // The cleanup prompt starts with a long static part (system prompt + examples) that is the same for
 // every dictation. It's decoded once and kept: attention-only models just drop the tokens after it,
 // recurrent/hybrid models (whose state can't be truncated) restore a snapshot taken right after it.
+// The decoded state is also saved to a cache file, so a restarted keyboard doesn't decode it again.
 #include <jni.h>
 #include <android/log.h>
 #include <atomic>
@@ -78,12 +79,14 @@ bool decode(Engine &e, std::vector<llama_token> &tokens) {
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_app_quoth_android_LlamaEngine_nativeLoad(JNIEnv *env, jclass, jstring path, jint nCtx, jint threads) {
+Java_app_quoth_android_LlamaEngine_nativeLoad(JNIEnv *env, jclass, jstring path, jint nCtx, jint threads, jboolean repack) {
     static bool backend = false;
     if (!backend) { llama_backend_init(); backend = true; }
     auto *e = new Engine();
     llama_model_params mp = llama_model_default_params();
     mp.n_gpu_layers = 0;
+    // Repacking copies the weights into faster layouts in RAM; without it they stay memory-mapped from the file.
+    mp.use_extra_bufts = repack;
     e->model = llama_model_load_from_file(jstr(env, path).c_str(), mp);
     if (!e->model) { delete e; return 0; }
     llama_context_params cp = llama_context_default_params();
@@ -100,8 +103,8 @@ Java_app_quoth_android_LlamaEngine_nativeLoad(JNIEnv *env, jclass, jstring path,
     e->tmpl = t ? t : "chatml";
     e->thinks = e->tmpl.find("enable_thinking") != std::string::npos;
     e->snapshots = llama_model_is_recurrent(e->model) || llama_model_is_hybrid(e->model);
-    LOGI("loaded: %.2fB params, ctx %d, threads %d, thinks %d, snapshots %d",
-         llama_model_n_params(e->model) / 1e9, nCtx, threads, e->thinks, e->snapshots);
+    LOGI("loaded: %.2fB params, ctx %d, threads %d, repack %d, thinks %d, snapshots %d",
+         llama_model_n_params(e->model) / 1e9, nCtx, threads, repack, e->thinks, e->snapshots);
     return reinterpret_cast<jlong>(e);
 }
 
@@ -125,7 +128,7 @@ Java_app_quoth_android_LlamaEngine_nativeAbort(JNIEnv *, jclass, jlong h) {
 // Returns the reply as UTF-8 bytes, or null on failure or abort.
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_app_quoth_android_LlamaEngine_nativeComplete(JNIEnv *env, jclass, jlong h, jobjectArray roles,
-                                                  jobjectArray contents, jint maxTokens) {
+                                                  jobjectArray contents, jint maxTokens, jstring cacheFile) {
     auto *e = reinterpret_cast<Engine *>(h);
     e->abort = false;
     const long long t0 = nowMs();
@@ -159,8 +162,21 @@ Java_app_quoth_android_LlamaEngine_nativeComplete(JNIEnv *env, jclass, jlong h, 
     if (!cached) {
         e->prefix.clear();
         llama_memory_clear(mem, true);
+        const std::string path = jstr(env, cacheFile);
         if (!prefix.empty()) {
-            if (!decode(*e, prefix)) return nullptr;
+            bool loaded = false;
+            if (!path.empty()) {
+                std::vector<llama_token> saved(prefix.size());
+                size_t count = 0;
+                loaded = llama_state_seq_load_file(e->ctx, path.c_str(), 0, saved.data(), saved.size(), &count) > 0 &&
+                         count == prefix.size() && saved == prefix;
+                if (!loaded) llama_memory_clear(mem, true);
+            }
+            if (!loaded) {
+                if (!decode(*e, prefix)) return nullptr;
+                if (!path.empty()) llama_state_seq_save_file(e->ctx, path.c_str(), 0, prefix.data(), prefix.size());
+            }
+            LOGI("prefix %s", loaded ? "loaded from the cache file" : "decoded");
             if (e->snapshots) {
                 e->snapshot.resize(llama_state_seq_get_size(e->ctx, 0));
                 llama_state_seq_get_data(e->ctx, e->snapshot.data(), e->snapshot.size(), 0);

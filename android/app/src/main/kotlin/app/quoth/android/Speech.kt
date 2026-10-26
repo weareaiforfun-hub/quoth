@@ -23,7 +23,8 @@ import java.util.concurrent.Executors
  */
 object Speech {
     val model = ModelCatalog.whisperBase
-    val defaultCleanupModel = ModelCatalog.qwen35_4b
+    /** Qwen 3.5 2B: on a Pixel 9a ~1.5 s per dictation (p90 2.8 s), 0 hard failures; the 4B models score higher but are slow there. */
+    val defaultCleanupModel = ModelCatalog.qwen35_2b
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "quoth-speech") }
     private var whisper: WhisperEngine? = null
     private var llama: LlamaEngine? = null
@@ -86,7 +87,10 @@ object Speech {
         if (llamaFile != cm.file) { llama?.close(); llama = null; llamaFile = null }
         if (llama == null && downloader(context).isInstalled(cm)) {
             val t0 = System.currentTimeMillis()
-            llama = LlamaEngine.load(File(modelDir(context), cm.file))
+            // Debug builds: files/debug-no-repack keeps the weights memory-mapped (for measuring RAM use against speed).
+            val repack = !(BuildConfig.DEBUG && File(context.filesDir, "debug-no-repack").exists())
+            val cache = File(context.cacheDir, "prompt-${cm.file.removeSuffix(".gguf")}.bin")
+            llama = LlamaEngine.load(File(modelDir(context), cm.file), cache, repack = repack)
             llamaFile = cm.file
             Log.i(TAG, "cleanup model ${cm.name} loaded in ${System.currentTimeMillis() - t0}ms: ${llama != null}")
         }
@@ -104,13 +108,22 @@ object Speech {
         worker.execute {
             val cleaner = pipeline(appContext).cleaner ?: run { Log.i(TAG, "eval: no cleanup model"); return@execute }
             val name = cleanupModel(appContext).name
+            // Fill the prompt cache first, without a timeout, as the keyboard's warm-up does.
+            val t0 = System.currentTimeMillis()
+            runCatching { cleaner.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
+            Log.i(TAG, "eval warm-up ${System.currentTimeMillis() - t0}ms")
             val cases = CleanupCase.load(file.readText())
+            val out = File(appContext.filesDir, "eval-results.log").apply { writeText("") }
             val results = ModelBench.runCleanup(cleaner, name, cases, timeout = 120.0) { r ->
-                Log.i(TAG, "eval ${r.verdict.symbol} ${r.caseID} ${r.ms}ms ${r.verdict.problems.joinToString(", ")} | ${r.output.replace("\n", "⏎")}")
+                val line = "eval ${r.verdict.symbol} ${r.caseID} ${r.ms}ms ${r.verdict.problems.joinToString(", ")} | ${r.output.replace("\n", "⏎")}"
+                Log.i(TAG, line)
+                out.appendText(line + "\n")
             }
             val s = ModelBench.summarize(results, name)
-            Log.i(TAG, "eval done $name: exact ${s.exact}/${s.cases}, same words ${s.sameWords}/${s.cases}, " +
-                "hard fails ${s.serious}, p50 ${s.p50ms}ms, p90 ${s.p90ms}ms, max ${results.maxOf { it.ms }}ms")
+            val summary = "eval done $name: exact ${s.exact}/${s.cases}, same words ${s.sameWords}/${s.cases}, " +
+                "hard fails ${s.serious}, p50 ${s.p50ms}ms, p90 ${s.p90ms}ms, max ${results.maxOf { it.ms }}ms"
+            out.appendText(summary + "\n")
+            Log.i(TAG, summary)
         }
     }
 

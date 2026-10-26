@@ -3,7 +3,7 @@
 # pushes the GGUF (once) and the cases, runs them through LlamaEngine in a debug build, and prints the
 # per-case lines and the summary. Outputs also go to eval-<model>.tsv for comparing with `:core:eval`.
 #
-# Usage: scripts/eval-device.sh path/to/model.gguf     (ANDROID_SERIAL picks the device when several are connected)
+# Usage: scripts/eval-device.sh path/to/model.gguf [--no-repack]   (ANDROID_SERIAL picks the device when several are connected)
 # The model must be one of ModelCatalog.cleanup. Keep the phone unlocked with the screen on.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -23,6 +23,8 @@ if [ "$("$ADB" shell run-as "$PKG" stat -c %s "files/models/$NAME" 2>/dev/null |
   push "$MODEL" "files/models/$NAME"
 fi
 push ../Evals/cleanup-golden.jsonl files/cleanup-golden.jsonl
+if [ "${2:-}" = --no-repack ]; then "$ADB" shell run-as "$PKG" touch files/debug-no-repack; else "$ADB" shell run-as "$PKG" rm -f files/debug-no-repack; fi
+"$ADB" shell dumpsys meminfo | grep -E "Free RAM|Used RAM" || true
 printf %s "$NAME" > /tmp/quoth-dcm.$$ && push /tmp/quoth-dcm.$$ files/debug-cleanup-model && rm /tmp/quoth-dcm.$$
 
 "$ADB" shell am force-stop "$PKG"
@@ -34,11 +36,12 @@ for _ in $(seq 1 600); do
   sleep 2
 done
 "$ADB" logcat -d -s Quoth QuothLlama AndroidRuntime | grep -E "loaded|FATAL" || true
-"$ADB" logcat -d -s Quoth | sed -n 's/.*Quoth *: //p' | grep -E "^eval" > "eval-${NAME%.gguf}.log" || true
+"$ADB" shell run-as "$PKG" cat files/eval-results.log > "eval-${NAME%.gguf}.log" || true
 python3 -I -c 'import sys,re
 for l in open(sys.argv[1], encoding="utf-8"):
     m = re.match(r"^eval \S+ (\S+) \d+ms.*? \| (.*)$", l.rstrip("\n"))
     if m: print(m[1] + "\t" + m[2])' "eval-${NAME%.gguf}.log" > "eval-${NAME%.gguf}.tsv"
 cat "eval-${NAME%.gguf}.log"
 "$ADB" logcat -d -s QuothLlama | grep timing | tail -3
-"$ADB" shell run-as "$PKG" rm -f files/cleanup-golden.jsonl files/debug-cleanup-model
+"$ADB" shell dumpsys meminfo "$PKG" | grep -E "TOTAL PSS|TOTAL RSS|TOTAL SWAP" || true
+"$ADB" shell run-as "$PKG" rm -f files/cleanup-golden.jsonl files/debug-cleanup-model files/debug-no-repack
