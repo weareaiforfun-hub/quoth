@@ -9,28 +9,13 @@ Play uses two keys:
 - **The app signing key** is made and kept by Google (Play App Signing, the default for new apps). It signs what users install.
 - **The upload key** is yours. It signs what you upload, so Google knows it's you. If it's lost or leaked, Play support can reset it, so it's less precious than the Mac's certificate, but keep it safe all the same.
 
-**(Arian) Create the upload key** in Terminal. `keytool` asks for a password (twice) and a name. Use a new password and save it in your password manager:
+**(Arian) Create the upload key** with one command in Terminal. It asks for a **new** password (at least 12 characters, used nowhere else, not your Mac's password), creates `~/.quoth/quoth-upload.jks`, and stores the password in your Mac's Keychain as "quoth-upload", where the release build finds it. No file ever holds the password. If you ran an earlier version of these steps, it offers to delete those files first.
 
 ```bash
-mkdir -p ~/.quoth && chmod 700 ~/.quoth
+~/Claude/quoth/android/scripts/make-upload-key.sh
 ```
 
-```bash
-/opt/homebrew/opt/openjdk@17/bin/keytool -genkeypair -v -keystore ~/.quoth/quoth-upload.jks -alias quoth-upload -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Quoth"
-```
-
-**(Arian) Tell the build where it is:** create `~/.quoth/android-signing.properties` in a text editor with these four lines, putting your password in both places:
-
-```
-storeFile=/Users/arian/.quoth/quoth-upload.jks
-storePassword=YOUR-PASSWORD
-keyAlias=quoth-upload
-keyPassword=YOUR-PASSWORD
-```
-
-Then `chmod 600 ~/.quoth/android-signing.properties`. The build reads this file (or the file named by `QUOTH_SIGNING`); it's outside the repo and never committed.
-
-**(Arian) Back up** `quoth-upload.jks` and its password off the Mac (for example in your password manager as an attachment, or on an encrypted USB stick).
+**(Arian) Back up** `quoth-upload.jks` and its password off the Mac: for example, save the password in your password manager and attach the file to the same entry, or copy the file to an encrypted USB stick. The script opens the folder for you.
 
 ## Build
 
@@ -42,7 +27,7 @@ The signed bundle is `app/build/outputs/bundle/release/app-release.aab`. It cont
 
 Before each release, bump `versionCode` (by 1) and `versionName` in `app/build.gradle.kts`, and run the e2e test on a phone (`scripts/e2e-emulator.sh`, see `android/README.md`).
 
-For a local test of a release build without the upload key: `./gradlew :app:assembleRelease -Pquoth.debugSign=true` (signed with the debug key; never upload it).
+The build reads the key from `~/.quoth/quoth-upload.jks` and the password from the Keychain (`QUOTH_UPLOAD_KEY` and `QUOTH_UPLOAD_PASSWORD` override them). For a local test of a release build without the upload key: `./gradlew :app:assembleRelease -Pquoth.debugSign=true` (signed with the debug key; never upload it).
 
 ## Play Console
 

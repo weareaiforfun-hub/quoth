@@ -5,3 +5,8 @@ build/
 
 # Private notes, never published
 private/
+
+# Android signing: keys and password files never go in the repo.
+*.jks
+*.keystore
+*signing.properties
