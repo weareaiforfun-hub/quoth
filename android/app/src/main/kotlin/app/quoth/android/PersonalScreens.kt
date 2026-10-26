@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.Toast
 import app.quoth.core.DictionaryEntry
+import kotlin.concurrent.thread
 import app.quoth.core.HistoryEntry
 import app.quoth.core.Retention
 import app.quoth.core.StyleCategory
@@ -19,7 +20,7 @@ import app.quoth.android.Ui.clear
 /** Past dictations: what was inserted, and what the speech model heard. */
 class HistoryScreen : Screen() {
     override val heading = "History"
-    override val subtitle = "Your recent dictations, kept on this phone only. Tap Copy to use one again."
+    override val subtitle = "Your recent dictations, kept on this phone only. Tap Fix to correct a name, and Quoth learns it."
     private var filter = ""
     private val search by lazy {
         Ui.field(this, "Search").apply {
@@ -56,15 +57,43 @@ class HistoryScreen : Screen() {
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
+            addView(Ui.button(context, "Fix") { fix(e) })
             addView(Ui.button(context, "Copy") {
                 getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Dictation", e.final))
                 Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dp(8)
             })
             addView(Ui.button(context, "Delete") { Store.history(context).delete(e.id); render() },
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     marginStart = dp(8)
                 })
         }, Ui.gap(context, 8))
+    }
+
+    /** Lets the user correct a dictation; corrected names go to the Dictionary, as when correcting in the text field. */
+    private fun fix(e: HistoryEntry) {
+        val box = Ui.field(this, "Text", multiLine = true).apply { setText(e.final); setSelection(e.final.length) }
+        val form = LinearLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(box, Ui.wide()) }
+        AlertDialog.Builder(this).setTitle("Fix this dictation").setView(form)
+            .setMessage(if (Store.personal(this).autoLearn) "Correct any misspelled names. Quoth adds them to your Dictionary so it gets them right next time."
+                else "Correct the text. (Learning words is off in Dictionary.)")
+            .setPositiveButton("Save") { _, _ ->
+                val fixed = box.text.toString().trim()
+                if (fixed.isEmpty() || fixed == e.final) return@setPositiveButton
+                Store.history(this).edit(e.id, fixed)
+                render()
+                thread {
+                    val words = AutoLearner.learnable(this, e.final, e.final, fixed, null)
+                    var added = emptyList<String>()
+                    if (words.isNotEmpty()) Store.updatePersonal(this) { p -> p.learning(words).also { added = it.second }.first }
+                    runOnUiThread {
+                        Toast.makeText(this, if (added.isEmpty()) "Saved" else "Added to your Dictionary: ${added.joinToString(", ")}",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null).show()
     }
 }
 
@@ -92,6 +121,18 @@ class DictionaryScreen : Screen() {
             }, Ui.gap(context, 6))
             error?.let { addView(Ui.text(context, it, 14f, Ui.RED), Ui.gap(context, 6)) }
         })
+        add(Ui.card(this).apply {
+            addView(Switch(context).apply {
+                text = "Learn names when I correct a dictation"
+                textSize = 16f
+                setTextColor(Ui.INK)
+                isChecked = Store.personal(context).autoLearn
+                setOnCheckedChangeListener { _, on -> Store.updatePersonal(context) { it.copy(autoLearn = on) } }
+            })
+            addView(Ui.text(context, "When you fix a name Quoth got wrong, then come back to the Quoth keyboard (or use Fix in History), " +
+                "Quoth adds the right spelling here. Ordinary words are never added, and words you delete stay deleted.",
+                13f, Ui.MUTED), Ui.gap(context, 4))
+        }, 12)
         val entries = Store.personal(this).dictionary.sortedBy { it.phrase.lowercase() }
         section(if (entries.size == 1) "1 entry" else "${entries.size} entries")
         if (entries.isEmpty()) add(Ui.text(this, "Add names, products and jargon you use often.", 15f, Ui.MUTED))
@@ -117,7 +158,7 @@ class DictionaryScreen : Screen() {
             contentDescription = if (e.starred) "Starred: always sent to the speech model" else "Star: always send to the speech model"
         })
         val label = if (e.kind == DictionaryEntry.Kind.WORD) e.phrase else "${e.phrase}  →  ${e.replacement}"
-        addView(Ui.text(context, label + if (e.uses > 0) "   ${e.uses}×" else ""),
+        addView(Ui.text(context, label + (if (e.autoLearned) "   · learned" else "") + if (e.uses > 0) "   ${e.uses}×" else ""),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(Ui.button(context, "Delete") { Store.updatePersonal(context) { it.deleting(e.id) }; render() })
     }

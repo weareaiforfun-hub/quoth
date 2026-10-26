@@ -37,6 +37,8 @@ class StorageTest {
         assertEquals(3, h.recent().size)
         h.purge(Retention.DAY, now)
         assertTrue(h.recent().none { it.final == "Old." })
+        h.edit(h.recent().last().id, "Fixed.")
+        assertEquals("Fixed.", h.recent().last().final)
         h.delete(h.recent().first().id)
         assertEquals(1, HistoryStore(java.io.File(dir, "history.json")).recent().size)
         h.add(HistoryEntry(createdAt = now, raw = "x", final = "X."), Retention.NEVER, now)

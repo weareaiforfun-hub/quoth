@@ -102,6 +102,11 @@ class HistoryStore(file: File, private val limit: Int = 1000) {
         store.update { h -> HistoryFile(h.entries.filter { it.id != id }) }
     }
 
+    /** Replaces an entry's text (the user fixed it in History). */
+    fun edit(id: String, final: String) {
+        store.update { h -> HistoryFile(h.entries.map { if (it.id == id) it.copy(final = final) else it }) }
+    }
+
     fun clear() {
         store.update { HistoryFile() }
     }

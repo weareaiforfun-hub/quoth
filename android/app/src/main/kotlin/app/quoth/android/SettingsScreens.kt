@@ -67,7 +67,8 @@ class SettingsScreen : Screen() {
 
         section("About")
         add(Ui.text(this, "Quoth ${packageManager.getPackageInfo(packageName, 0).versionName} for Android. Free and open source: " +
-            "github.com/weareaiforfun-hub/quoth. Speech by whisper.cpp, clean-up by llama.cpp (both MIT).", 13f, Ui.MUTED))
+            "github.com/weareaiforfun-hub/quoth. Speech by whisper.cpp, clean-up by llama.cpp (both MIT). " +
+            "Auto-learn's English word list: SCOWL, © Kevin Atkinson, used under its licence.", 13f, Ui.MUTED))
     }
 
     private fun navRow(label: String, value: String, onClick: () -> Unit) = Ui.card(this).apply {

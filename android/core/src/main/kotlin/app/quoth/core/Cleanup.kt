@@ -60,6 +60,8 @@ data class CleanupContext(
     val variant: LanguageVariant = LanguageVariant.NONE,
     /** Set by the pipeline when a first attempt answered the transcript instead of cleaning it. */
     val answeredBefore: Boolean = false,
+    /** Android: the kind of field (one line, search box, subject). */
+    val field: FieldKind = FieldKind.NORMAL,
 ) {
     val isCodeEditor: Boolean get() = bundleID in DevFormatting.codeEditors
     val isFileTaggingEditor: Boolean get() = bundleID in DevFormatting.fileTaggingEditors

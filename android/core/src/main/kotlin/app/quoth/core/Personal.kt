@@ -109,6 +109,17 @@ data class PersonalData(
             deletedWords = deletedWords.filterNot { it.equals(entry.output, ignoreCase = true) }) to null
     }
 
+    /** Adds auto-learned words that pass validation; returns the new data and the words actually added. */
+    fun learning(words: List<String>): Pair<PersonalData, List<String>> {
+        var p = this
+        val added = mutableListOf<String>()
+        for (w in words) {
+            val (next, error) = p.adding(DictionaryEntry.word(w, autoLearned = true))
+            if (error == null) { p = next; added += w }
+        }
+        return p to added
+    }
+
     /** Removes an entry; deleted words are never re-added by auto-learn. */
     fun deleting(id: String): PersonalData {
         val e = dictionary.firstOrNull { it.id == id } ?: return this

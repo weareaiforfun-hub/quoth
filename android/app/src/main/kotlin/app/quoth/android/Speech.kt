@@ -58,8 +58,10 @@ object Speech {
     /**
      * Runs the whole pipeline on the background thread and delivers the outcome (or null on failure), off the
      * main thread. [target] says where the text goes; the user's settings and personal data are added here.
+     * [keepHistory] is false where the app asked keyboards not to remember anything (incognito).
      */
-    fun dictate(context: Context, samples: FloatArray, target: CleanupContext, done: (DictationOutcome?) -> Unit) {
+    fun dictate(context: Context, samples: FloatArray, target: CleanupContext, keepHistory: Boolean = true,
+                done: (DictationOutcome?) -> Unit) {
         val app = context.applicationContext
         worker.execute {
             val result = runCatching {
@@ -78,7 +80,7 @@ object Speech {
                 pipeline.run(samples, level, pinned, ctx, personal).also { o ->
                     Log.i(TAG, "timing asr=${o.asrMs}ms llm=${o.llmMs}ms audio=${samples.size * 1000L / Recorder.RATE}ms" +
                         " level=${level.raw} lang=${o.language}" + (o.fallbackReason?.let { r -> " fallback=$r" } ?: ""))
-                    record(app, o, target.bundleID)
+                    record(app, o, target.bundleID, keepHistory)
                 }
             }
             result.exceptionOrNull()?.let { Log.e(TAG, "dictation failed", it) }
@@ -87,9 +89,10 @@ object Speech {
     }
 
     /** Saves the dictation to History (per the retention setting) and counts dictionary uses. */
-    private fun record(app: Context, o: DictationOutcome, pkg: String?) {
+    private fun record(app: Context, o: DictationOutcome, pkg: String?, keepHistory: Boolean) {
         if (o.final.isBlank()) return
         Store.updatePersonal(app) { it.countingUses(o.firedEntries) }
+        if (!keepHistory) return
         val label = pkg?.let { runCatching { app.packageManager.run { getApplicationLabel(getApplicationInfo(it, 0)).toString() } }.getOrNull() }
         Store.history(app).add(HistoryEntry(createdAt = System.currentTimeMillis(), raw = o.raw, final = o.final.trim(), app = pkg,
             appName = label, asrMs = o.asrMs, llmMs = o.llmMs, fallbackReason = o.fallbackReason), Store.settings(app).retention)

@@ -11,7 +11,7 @@ model the text is Whisper's, with the Mac app's spoken-punctuation and style rul
 | --- | --- |
 | `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
 | `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (home: setup, try-it box, links to the screens), `PersonalScreens.kt` (History, Dictionary, Snippets, Style), `SettingsScreens.kt` (Settings, Models), `Store` (settings.json, personal.json, history.json in the app's files), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
-| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone) |
+| `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone), `make-wordlist.py` (auto-learn's word list) |
 
 ## Build and test (macOS)
 
@@ -56,3 +56,13 @@ normally a `llama-server` on the Mac. To compare with the Swift version, point b
   but drops or garbles words, so neither is used.
 - Kotlin regexes go through `Rx` (Text.kt) so `\b`, `\w` and `\s` are Unicode-aware on the JVM as on Android and the Mac.
 - If `uiautomator dump` keeps failing with "null root node" on a phone, its accessibility connection is stuck (seen after an app crash during a test); restarting the phone fixes it. The e2e script stops instead of using a stale dump.
+- Auto-learn compares the field after an insert with the field when Quoth sees it again (back from another keyboard,
+  or after edits made with Quoth up), then `AutoLearn` (the Mac's rules) picks corrected names. A keyboard can't read
+  a field while another keyboard is up, so a fix followed by sending without coming back isn't seen; History's
+  Fix covers that. Ordinary words come from `assets/common-words-en.txt`, built from SCOWL (licence beside it) by
+  `scripts/make-wordlist.py`. The phone's spell checker isn't used: asked from a keyboard with a field focused,
+  it answered that every word, even "zorbleth", is spelled right.
+- Field kinds from `EditorInfo`: one-line fields get spaces instead of line breaks (a newline can submit them);
+  search, address and subject fields also lose the final period. Fields flagged `IME_FLAG_NO_PERSONALIZED_LEARNING`
+  (incognito tabs) are left out of History and auto-learn.
+- The e2e script backs up and restores `personal.json` and `history.json`.

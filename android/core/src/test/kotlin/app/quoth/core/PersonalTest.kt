@@ -8,7 +8,7 @@ import org.junit.Test
 import java.nio.file.Files
 import kotlin.math.abs
 
-// Ported from Tests/QuothCoreTests/PersonalTests.swift (all but AutoLearn, which comes with the personal features).
+// Ported from Tests/QuothCoreTests/PersonalTests.swift (AutoLearn is in AutoLearnTest).
 
 class DictionaryTest {
     private val entries = listOf(

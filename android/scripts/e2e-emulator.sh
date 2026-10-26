@@ -87,13 +87,18 @@ check() { # name, expected (exact), [another accepted text]
   else echo "FAIL $1"; echo "  expected: $2"; echo "  got:      $got"; fail=$((fail+1)); fi
 }
 
-# A test dictionary (the user's own personal.json is put back at the end). Written while the app is stopped,
+# A test dictionary (the user's own personal.json and history.json are put back at the end). Written while the app is stopped,
 # because the app keeps it in memory.
 "$ADB" shell am force-stop "$PKG"
-had_personal=false
+# History is put back too, so the test dictations don't stay in the user's History.
+had_personal=false; had_history=false
 if "$ADB" shell run-as "$PKG" ls files/personal.json >/dev/null 2>&1; then
   had_personal=true
   "$ADB" shell run-as "$PKG" cp files/personal.json files/personal.json.e2e-backup
+fi
+if "$ADB" shell run-as "$PKG" ls files/history.json >/dev/null 2>&1; then
+  had_history=true
+  "$ADB" shell run-as "$PKG" cp files/history.json files/history.json.e2e-backup
 fi
 printf '%s' '{"dictionary":[{"id":"E2E-1","kind":"replacement","phrase":"cube control","replacement":"kubectl"}]}' > "$WORK/personal.json"
 "$ADB" push -q "$WORK/personal.json" /data/local/tmp/personal.json
@@ -101,8 +106,9 @@ printf '%s' '{"dictionary":[{"id":"E2E-1","kind":"replacement","phrase":"cube co
 "$ADB" shell rm /data/local/tmp/personal.json
 restore_personal() {
   "$ADB" shell am force-stop "$PKG"
-  "$ADB" shell run-as "$PKG" rm -f files/personal.json
+  "$ADB" shell run-as "$PKG" rm -f files/personal.json files/history.json
   if $had_personal; then "$ADB" shell run-as "$PKG" mv files/personal.json.e2e-backup files/personal.json; fi
+  if $had_history; then "$ADB" shell run-as "$PKG" mv files/history.json.e2e-backup files/history.json; fi
 }
 trap 'restore_personal; rm -rf "${WORK:?}"' EXIT
 
@@ -139,6 +145,47 @@ if "$ADB" shell run-as "$PKG" ls files/models/ | grep -q '\.gguf'; then
   else echo "FAIL cleanup applies a correction"; echo "  got: $added"; fail=$((fail+1)); fi
 fi
 
+# Auto-learn. Respells the name Quoth just wrote, the way a user fixes it, and expects the new spelling in
+# the Dictionary. respell: replaces the last word ending in "$1" (any case) with "$2", typing at the end of the field.
+respell() {
+  local t; t="$(ui text)"
+  read -r dels rest < <(python3 -I -c '
+import re, sys
+t, name = sys.argv[1], sys.argv[2]
+m = [x for x in re.finditer(r"[A-Za-z]+", t)][-1]
+print(len(t) - m.start(), t[m.end():].replace(" ", "%s") or "-")' "$t" "$1")
+  "$ADB" shell input keyevent KEYCODE_MOVE_END
+  "$ADB" shell input keyevent $(printf 'KEYCODE_DEL %.0s' $(seq 1 "$dels"))
+  "$ADB" shell input text "$2${rest#-}"
+}
+learned() { # word: true when it's in the Dictionary, marked as learned
+  "$ADB" shell run-as "$PKG" cat files/personal.json | python3 -I -c '
+import json, sys
+d = json.load(sys.stdin).get("dictionary", [])
+sys.exit(0 if any(e["phrase"] == sys.argv[1] and e.get("autoLearned") for e in d) else 1)' "$1"
+}
+# 1. Fixed with Quoth's own keys (typed while Quoth is up): learned once the edits settle.
+dictate "Please call Nadia"
+respell Nadia Nadiah
+sleep 6
+if learned Nadiah; then echo "PASS auto-learn while Quoth is up"; pass=$((pass+1))
+else echo "FAIL auto-learn while Quoth is up"; echo "  field: $(ui text)"; "$ADB" logcat -d -s Quoth | grep -E "auto-learn|inserted|spell" || true; fail=$((fail+1)); fi
+# 2. Fixed with another keyboard, then back to Quoth: learned when Quoth sees the field again.
+other_ime="$("$ADB" shell ime list -s | tr -d '\r' | grep -v "^$PKG/" | grep -iv voice | head -1)"
+if [ -n "$other_ime" ]; then
+  dictate "Book a table for Ravi"
+  "$ADB" shell ime set "$other_ime" >/dev/null; sleep 2
+  respell Ravi Raavi; sleep 1
+  "$ADB" shell ime set "$PKG/.android.QuothKeyboardService" >/dev/null; sleep 5
+  if learned Raavi; then echo "PASS auto-learn after another keyboard"; pass=$((pass+1))
+  else echo "FAIL auto-learn after another keyboard"; echo "  field: $(ui text)"; fail=$((fail+1)); fi
+fi
+# 3. An ordinary word is never learned ("apples" changed to "apple").
+dictate "I bought apples"
+respell apples apple; sleep 6
+if learned apple; then echo "FAIL ordinary word learned"; fail=$((fail+1))
+else echo "PASS ordinary word not learned"; pass=$((pass+1)); fi
+
 # Silence: whisper says [BLANK_AUDIO] or a stock phrase; nothing should be inserted.
 "$ADB" shell run-as "$PKG" rm -f files/debug-input.wav
 before_silence="$(ui text)"
@@ -152,6 +199,29 @@ w.writeframes(struct.pack('<h', 0) * 32000); w.close()"
 read -r x y < <(mic_xy)
 "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 8
 check "silence inserts nothing" "$before_silence"
+
+# A one-line search box: no final period, no line breaks.
+"$ADB" shell am start -f 0x10008000 -n "$PKG/.android.MainActivity" --ez search true >/dev/null
+sleep 3
+ui focus; sleep 2
+dictate "weather in Berlin tomorrow"
+got="$(ui text)"
+if [[ -n "$got" && "$got" != *. && "$got" != *$'\n'* ]]; then echo "PASS search box: no final period ($got)"; pass=$((pass+1))
+else echo "FAIL search box"; echo "  got: $got"; fail=$((fail+1)); fi
+
+# Incognito (the app asks keyboards not to remember): the text is inserted, but History doesn't keep it.
+history_count() { "$ADB" shell run-as "$PKG" cat files/history.json 2>/dev/null | python3 -I -c '
+import json, sys
+try: print(len(json.load(sys.stdin)["entries"]))
+except Exception: print(0)'; }
+n0="$(history_count)"
+"$ADB" shell am start -f 0x10008000 -n "$PKG/.android.MainActivity" --ez incognito true >/dev/null
+sleep 3
+ui focus; sleep 2
+dictate "this is a private note"
+got="$(ui text)"
+if [[ "$got" == *rivate* && "$(history_count)" == "$n0" ]]; then echo "PASS incognito: inserted, not in History"; pass=$((pass+1))
+else echo "FAIL incognito"; echo "  got: $got, history $n0 -> $(history_count)"; fail=$((fail+1)); fi
 
 # Password box (the setup screen's debug-only password extra): the mic is off, so nothing is inserted.
 "$ADB" push -q "$WORK/in.wav" /data/local/tmp/in.wav

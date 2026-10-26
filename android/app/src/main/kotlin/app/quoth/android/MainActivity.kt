@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
@@ -72,9 +73,17 @@ class MainActivity : Activity() {
             gravity = Gravity.TOP
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             contentDescription = "Try it here"
-            // Debug builds only: start with --ez password true to make this a password box (for automated tests).
+            // Debug builds only, for automated tests: --ez password true makes this a password box, --ez search true
+            // a one-line search box, and --ez incognito true asks keyboards not to remember (like an incognito tab).
             if (BuildConfig.DEBUG && intent.getBooleanExtra("password", false))
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            if (BuildConfig.DEBUG && intent.getBooleanExtra("search", false)) {
+                inputType = InputType.TYPE_CLASS_TEXT
+                imeOptions = EditorInfo.IME_ACTION_SEARCH
+                minLines = 1
+            }
+            if (BuildConfig.DEBUG && intent.getBooleanExtra("incognito", false))
+                imeOptions = imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
         })
 
         column.addView(Ui.text(this, "Make it yours", 17f).apply { setPadding(0, pad, 0, (8 * dp).toInt()) })

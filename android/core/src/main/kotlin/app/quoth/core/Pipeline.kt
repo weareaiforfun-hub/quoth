@@ -95,7 +95,11 @@ class DictationPipeline(
 
     /** Everything after ASR: cleanup + deterministic rules. Also used by retry and evals. */
     fun process(raw: String, level: CleanupLevel, context: CleanupContext, personal: PersonalData,
-                outcome: DictationOutcome): String {
+                outcome: DictationOutcome): String =
+        FieldRules.apply(processText(raw, level, context, personal, outcome), context.field)
+
+    private fun processText(raw: String, level: CleanupLevel, context: CleanupContext, personal: PersonalData,
+                            outcome: DictationOutcome): String {
         // A snippet spoken on its own is inserted verbatim; no LLM needed.
         TextRules.snippetSpokenAlone(raw, personal.snippets)?.let {
             outcome.firedSnippets = listOf(it.id)
