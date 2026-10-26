@@ -97,8 +97,15 @@ check "sentence" "Hi Sam, the meeting moved to Thursday at 3. Could you bring th
 dictate "see you there"
 check "appends with a space" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there."
 
+# With the cleanup model installed: the repeated words go (golden case filler-3).
+if "$ADB" shell run-as "$PKG" ls files/models/ | grep -q '\.gguf'; then
+  dictate "can we can we move the call to tomorrow"
+  check "cleanup removes repeats" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there. Can we move the call to tomorrow?"
+fi
+
 # Silence: whisper says [BLANK_AUDIO] or a stock phrase; nothing should be inserted.
 "$ADB" shell run-as "$PKG" rm -f files/debug-input.wav
+before_silence="$(ui text)"
 python3 -I -c "
 import struct, wave
 w = wave.open('$WORK/silence.wav', 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
@@ -108,7 +115,7 @@ w.writeframes(struct.pack('<h', 0) * 32000); w.close()"
 "$ADB" logcat -c
 read -r x y < <(mic_xy)
 "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 8
-check "silence inserts nothing" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there."
+check "silence inserts nothing" "$before_silence"
 
 # Password box (the setup screen's debug-only password extra): the mic is off, so nothing is inserted.
 "$ADB" push -q "$WORK/in.wav" /data/local/tmp/in.wav

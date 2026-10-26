@@ -138,7 +138,7 @@ class QuothKeyboardService : InputMethodService() {
         Speech.debugInput(this)?.let { samples = Recorder.readWav(it); Log.i(Speech.TAG, "debug input: ${it.name}") }
         busy = true
         refresh()
-        status.text = "Writing…"
+        status.text = if (Speech.warming) "Getting ready… (only after a restart)" else "Writing…"
         Speech.dictate(this, samples, target()) { outcome ->
             main.post {
                 busy = false

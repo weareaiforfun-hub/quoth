@@ -23,22 +23,23 @@ object ModelCatalog {
     private fun gguf(repo: String, file: String) = "https://huggingface.co/$repo/resolve/main/$file"
 
     // Cleanup models for llama.cpp (Q4_K_M, all Apache-2.0). Scores are the golden evals
-    // (Evals/cleanup-golden.jsonl, 66 cases: exact / same words / hard failures), run on the Mac's llama-server.
-    /** 52 / 61 / 0: the best small model tested, better than the Mac's Lite model. */
+    // (Evals/cleanup-golden.jsonl, 66 cases: exact / same words / hard failures) on a Pixel 9a
+    // (scripts/eval-device.sh, screen on), with the time per dictation (p50 / p90).
+    /** 51 / 60 / 0, 3.4 s / 8.1 s, ~3.6 GB of RAM: the best quality; for phones with 12 GB or more. */
     val qwen35_4b = ModelFile("Qwen_Qwen3.5-4B-Q4_K_M.gguf", "Qwen 3.5 4B", 3_013_027_808,
         "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983", gguf("bartowski/Qwen_Qwen3.5-4B-GGUF", "Qwen_Qwen3.5-4B-Q4_K_M.gguf"))
-    /** 49 / 59 / 0: the Mac's Lite model. */
+    /** 48 / 58 / 1, 8.8 s / 15.7 s: the Mac's Lite model, slower than Qwen 3.5 4B on a phone. */
     val qwen3_4b = ModelFile("Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf", "Qwen 3 4B", 2_497_280_736,
         "2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e",
         gguf("bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF", "Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf"))
-    /** 29 / 54 / 1. */
+    /** 30 / 54 / 1 (timing not measured with the screen on). */
     val qwen3_1_7b = ModelFile("Qwen_Qwen3-1.7B-Q4_K_M.gguf", "Qwen 3 1.7B", 1_282_439_584,
         "72c5c3cb38fa32d5256e2fe30d03e7a64c6c79e668ad84057e3bd66e250b24fb", gguf("bartowski/Qwen_Qwen3-1.7B-GGUF", "Qwen_Qwen3-1.7B-Q4_K_M.gguf"))
-    /** 25 / 47 / 0. */
+    /** 24 / 48 / 0, 1.5 s / 2.8 s, ~1.7 GB of RAM: the default. Weak at self-corrections. */
     val qwen35_2b = ModelFile("Qwen_Qwen3.5-2B-Q4_K_M.gguf", "Qwen 3.5 2B", 1_396_198_496,
         "57a1085840f497d764a7fc5d346922dbde961efb54cc792ea81d694fd846a1d8", gguf("bartowski/Qwen_Qwen3.5-2B-GGUF", "Qwen_Qwen3.5-2B-Q4_K_M.gguf"))
 
-    val cleanup = listOf(qwen35_4b, qwen3_4b, qwen3_1_7b, qwen35_2b)
+    val cleanup = listOf(qwen35_2b, qwen35_4b, qwen3_4b, qwen3_1_7b)
 }
 
 /**

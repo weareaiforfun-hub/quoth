@@ -23,7 +23,7 @@ import java.util.concurrent.Executors
  */
 object Speech {
     val model = ModelCatalog.whisperBase
-    /** Qwen 3.5 2B: on a Pixel 9a ~1.5 s per dictation (p90 2.8 s), 0 hard failures; the 4B models score higher but are slow there. */
+    /** Qwen 3.5 2B: ~1.5 s per dictation on a Pixel 9a (p90 2.8 s). Qwen 3.5 4B is better but 2–3× slower and needs ~3.6 GB of RAM. */
     val defaultCleanupModel = ModelCatalog.qwen35_2b
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "quoth-speech") }
     private var whisper: WhisperEngine? = null
@@ -73,11 +73,21 @@ object Speech {
     /** Loads the engines in the background so the first dictation doesn't wait, and primes the cleanup prompt cache. */
     fun warmUp(context: Context) {
         val appContext = context.applicationContext
+        warming = true
         worker.execute {
-            if (!isModelInstalled(appContext)) return@execute
-            runCatching { pipeline(appContext).cleaner?.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
+            try {
+                if (isModelInstalled(appContext)) {
+                    runCatching { pipeline(appContext).cleaner?.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
+                }
+            } finally {
+                warming = false
+            }
         }
     }
+
+    /** True while the engines load after a (re)start; a dictation then waits for them. */
+    @Volatile var warming = false
+        private set
 
     /** Must run on the worker thread. Loads whatever models are installed, and drops a cleanup model that was swapped. */
     private fun pipeline(context: Context): DictationPipeline {
