@@ -98,6 +98,35 @@ data class PersonalData(
         return out
     }
 
+    /** Counts a use for each dictionary entry that fired (Dictionary shows it, and vocabulary() ranks by it). */
+    fun countingUses(fired: Collection<String>): PersonalData =
+        if (fired.isEmpty()) this else copy(dictionary = dictionary.map { if (it.id in fired) it.copy(uses = it.uses + 1) else it })
+
+    /** Adds a dictionary entry if it's valid; a word the user re-adds is no longer on the deleted list. */
+    fun adding(entry: DictionaryEntry): Pair<PersonalData, ValidationError?> {
+        validate(entry)?.let { return this to it }
+        return copy(dictionary = dictionary + entry,
+            deletedWords = deletedWords.filterNot { it.equals(entry.output, ignoreCase = true) }) to null
+    }
+
+    /** Removes an entry; deleted words are never re-added by auto-learn. */
+    fun deleting(id: String): PersonalData {
+        val e = dictionary.firstOrNull { it.id == id } ?: return this
+        return copy(dictionary = dictionary - e, deletedWords = deletedWords + e.output)
+    }
+
+    /** Adds a snippet, with the Mac's limits; returns an error message instead when it can't. */
+    fun addingSnippet(trigger: String, expansion: String): Pair<PersonalData, String?> {
+        val t = trigger.trim()
+        return when {
+            t.isEmpty() || expansion.isBlank() -> this to "Needs a trigger and the text"
+            t.length > 60 -> this to "Trigger: 60 characters at most"
+            expansion.length > 4000 -> this to "Text: 4,000 characters at most"
+            snippets.any { it.trigger.equals(t, ignoreCase = true) } -> this to "That trigger exists"
+            else -> copy(snippets = snippets + Snippet(trigger = t, expansion = expansion)) to null
+        }
+    }
+
     enum class ValidationError(val message: String) {
         EMPTY("Can't be empty"),
         TOO_LONG("60 characters at most"),

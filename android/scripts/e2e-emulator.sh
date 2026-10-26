@@ -16,7 +16,6 @@ APK=app/build/outputs/apk/debug/app-debug.apk
 PKG=app.quoth
 MODEL="${1:-$HOME/Library/Application Support/Quoth/models/ggml-base.bin}"
 WORK="$(mktemp -d)"
-trap 'rm -rf "${WORK:?}"' EXIT
 
 "$ADB" wait-for-device
 "$ADB" install -r "$APK" >/dev/null
@@ -34,7 +33,11 @@ cat > "$WORK/ui.py" <<'PY'
 import re, subprocess, sys
 ADB = sys.argv[1]
 def dump():
-    subprocess.run([ADB, "shell", "uiautomator", "dump", "/sdcard/ui.xml"], capture_output=True)
+    # Never read a stale dump: delete it first, and stop if a fresh one can't be made.
+    subprocess.run([ADB, "shell", "rm", "-f", "/sdcard/ui.xml"], capture_output=True)
+    out = subprocess.run([ADB, "shell", "uiautomator", "dump", "/sdcard/ui.xml"], capture_output=True, text=True).stdout
+    if "dumped" not in out:
+        sys.exit("uiautomator can't read the screen (" + out.strip() + "); restarting the device fixes a stuck one")
     return subprocess.run([ADB, "shell", "cat", "/sdcard/ui.xml"], capture_output=True, text=True).stdout
 def nodes():
     return re.findall(r'<node [^>]*?text="([^"]*)"[^>]*?class="([^"]*)"[^>]*?content-desc="([^"]*)"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', dump())
@@ -49,7 +52,7 @@ elif cmd == "text":  # print the try-it box's text (empty when only the hint sho
         if cls == "android.widget.EditText":
             print("" if t.startswith("Tap here, then tap") else html.unescape(t)); break
 PY
-ui() { python3 -I "$WORK/ui.py" "$ADB" "$@"; }
+ui() { python3 -I "$WORK/ui.py" "$ADB" "$@" || { echo "STOP: can't read the screen"; exit 1; }; }
 
 # The mic button lives in the keyboard window, which uiautomator doesn't dump: find it from the keyboard's bounds.
 mic_xy() {
@@ -78,13 +81,32 @@ dictate() { # text-to-speak, expected substring ("" = expect nothing inserted)
 }
 
 pass=0; fail=0
-check() { # name, expected (exact)
+check() { # name, expected (exact), [another accepted text]
   local got; got="$(ui text)"
-  if [ "$got" = "$2" ]; then echo "PASS $1"; pass=$((pass+1)); else echo "FAIL $1"; echo "  expected: $2"; echo "  got:      $got"; fail=$((fail+1)); fi
+  if [ "$got" = "$2" ] || { [ -n "${3:-}" ] && [ "$got" = "$3" ]; }; then echo "PASS $1"; pass=$((pass+1))
+  else echo "FAIL $1"; echo "  expected: $2"; echo "  got:      $got"; fail=$((fail+1)); fi
 }
 
-# Force-stopping a keyboard makes Android fall back to another one, so select Quoth afterwards.
+# A test dictionary (the user's own personal.json is put back at the end). Written while the app is stopped,
+# because the app keeps it in memory.
 "$ADB" shell am force-stop "$PKG"
+had_personal=false
+if "$ADB" shell run-as "$PKG" ls files/personal.json >/dev/null 2>&1; then
+  had_personal=true
+  "$ADB" shell run-as "$PKG" cp files/personal.json files/personal.json.e2e-backup
+fi
+printf '%s' '{"dictionary":[{"id":"E2E-1","kind":"replacement","phrase":"cube control","replacement":"kubectl"}]}' > "$WORK/personal.json"
+"$ADB" push -q "$WORK/personal.json" /data/local/tmp/personal.json
+"$ADB" shell run-as "$PKG" cp /data/local/tmp/personal.json files/personal.json
+"$ADB" shell rm /data/local/tmp/personal.json
+restore_personal() {
+  "$ADB" shell am force-stop "$PKG"
+  "$ADB" shell run-as "$PKG" rm -f files/personal.json
+  if $had_personal; then "$ADB" shell run-as "$PKG" mv files/personal.json.e2e-backup files/personal.json; fi
+}
+trap 'restore_personal; rm -rf "${WORK:?}"' EXIT
+
+# Force-stopping a keyboard makes Android fall back to another one, so select Quoth afterwards.
 "$ADB" shell ime enable "$PKG/.android.QuothKeyboardService" >/dev/null
 "$ADB" shell ime set "$PKG/.android.QuothKeyboardService" >/dev/null
 "$ADB" shell am start -n "$PKG/.android.MainActivity" >/dev/null
@@ -92,15 +114,29 @@ sleep 3
 ui focus; sleep 2
 
 dictate "Hi Sam, the meeting moved to Thursday at three. Could you bring the slides?"
-check "sentence" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides?"
+# The cleanup model may write the time as "3" or "3:00"; both are right.
+check "sentence" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides?" \
+  "Hi Sam, the meeting moved to Thursday at 3:00. Could you bring the slides?"
 
 dictate "see you there"
-check "appends with a space" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there."
+check "appends with a space" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there." \
+  "Hi Sam, the meeting moved to Thursday at 3:00. Could you bring the slides? See you there."
 
-# With the cleanup model installed: the repeated words go (golden case filler-3).
+# A dictionary replacement: "cube control" is written as "kubectl".
+before="$(ui text)"
+dictate "run cube control get pods"
+added="$(ui text)"; added="${added#"$before"}"
+if [[ "$added" == *kubectl* && "$added" != *"cube control"* ]]; then echo "PASS dictionary replacement"; pass=$((pass+1))
+else echo "FAIL dictionary replacement"; echo "  got: $added"; fail=$((fail+1)); fi
+
+# With the cleanup model installed: a spoken correction is applied (golden case backtrack-1). Whisper keeps
+# "actually", so only cleanup can turn this into "5 pm".
 if "$ADB" shell run-as "$PKG" ls files/models/ | grep -q '\.gguf'; then
-  dictate "can we can we move the call to tomorrow"
-  check "cleanup removes repeats" "Hi Sam, the meeting moved to Thursday at 3. Could you bring the slides? See you there. Can we move the call to tomorrow?"
+  before="$(ui text)"
+  dictate "let's meet at four, actually five p m"
+  added="$(ui text)"; added="${added#"$before"}"
+  if [[ "$added" == *5* && "$added" != *4* && "$added" != *[Aa]ctually* ]]; then echo "PASS cleanup applies a correction ($added)"; pass=$((pass+1))
+  else echo "FAIL cleanup applies a correction"; echo "  got: $added"; fail=$((fail+1)); fi
 fi
 
 # Silence: whisper says [BLANK_AUDIO] or a stock phrase; nothing should be inserted.

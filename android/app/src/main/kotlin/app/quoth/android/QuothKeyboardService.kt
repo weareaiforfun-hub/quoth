@@ -19,7 +19,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.quoth.core.CleanupContext
-import app.quoth.core.PersonalData
 import app.quoth.core.StyleCategory
 
 /**
@@ -159,7 +158,7 @@ class QuothKeyboardService : InputMethodService() {
         return CleanupContext(
             bundleID = app,
             category = category,
-            tone = PersonalData().styles[category],
+            tone = Store.personal(this).styles[category],
             textBeforeCursor = ic?.getTextBeforeCursor(600, 0)?.toString(),
             textAfterCursor = ic?.getTextAfterCursor(100, 0)?.toString(),
             hasSelection = !ic?.getSelectedText(0).isNullOrEmpty(),

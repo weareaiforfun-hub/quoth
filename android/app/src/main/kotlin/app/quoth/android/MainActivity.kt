@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
@@ -18,16 +17,17 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import app.quoth.core.ModelFile
-import kotlin.concurrent.thread
 
-/** Setup: microphone, speech model, enabling the keyboard, and a box to try it in. */
+/** Home: setup until it's done, a box to try the keyboard in, and the way to the other screens. */
 class MainActivity : Activity() {
     private lateinit var micStep: Step
     private lateinit var modelStep: Step
     private lateinit var cleanupStep: Step
     private lateinit var enableStep: Step
     private lateinit var switchStep: Step
-    private val downloading = mutableSetOf<String>()
+    private lateinit var setup: LinearLayout
+    private lateinit var ready: View
+    private var unlisten: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,51 +35,37 @@ class MainActivity : Activity() {
         val dp = resources.displayMetrics.density
         val pad = (20 * dp).toInt()
 
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad * 2, pad, pad)
-        }
-        column.addView(TextView(this).apply {
-            text = "Quoth"
-            textSize = 30f
-            setTextColor(INK)
-        })
-        column.addView(TextView(this).apply {
-            text = "Speak, and the text appears in whatever app you're typing in. Everything runs on this phone."
-            textSize = 15f
-            setTextColor(MUTED)
-            setPadding(0, (4 * dp).toInt(), 0, pad)
-        })
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column.addView(Ui.text(this, "Quoth", 30f))
+        column.addView(Ui.text(this, "Speak, and the text appears in whatever app you're typing in. Everything runs on this phone.",
+            15f, Ui.MUTED).apply { setPadding(0, (4 * dp).toInt(), 0, pad) })
 
         micStep = Step("1. Allow the microphone", "Allow") {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
         modelStep = Step("2. Download the speech model (${Speech.model.bytes / 1_000_000} MB)", "Download") {
-            download(Speech.model, modelStep)
+            Downloads.start(this, Speech.model)
         }
-        val cleanup = Speech.cleanupModel(this)
-        cleanupStep = Step("3. Download the clean-up model (%.1f GB)".format(cleanup.bytes / 1e9), "Download") {
-            download(cleanup, cleanupStep)
-        }
-        cleanupStep.detail("Optional. Removes ums, applies corrections and fixes punctuation. Best on Wi-Fi.")
+        cleanupStep = Step("", "Download") { Speech.cleanupModel(this)?.let { Downloads.start(this, it) } }
         enableStep = Step("4. Turn on the Quoth keyboard", "Open settings") {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
         switchStep = Step("5. Switch to Quoth", "Choose keyboard") {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
-        column.addView(micStep.view)
-        column.addView(modelStep.view)
-        column.addView(cleanupStep.view)
-        column.addView(enableStep.view)
-        column.addView(switchStep.view)
+        setup = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            for (s in listOf(micStep, modelStep, cleanupStep, enableStep, switchStep)) addView(s.view)
+        }
+        ready = Ui.card(this).apply {
+            addView(Ui.text(context, "✓ Quoth is ready", 17f, Ui.GREEN))
+            addView(Ui.text(context, "In any app, tap the keyboard button at the bottom right and pick Quoth.", 14f, Ui.MUTED),
+                Ui.gap(context, 2))
+        }
+        column.addView(setup)
+        column.addView(ready)
 
-        column.addView(TextView(this).apply {
-            text = "Try it here"
-            textSize = 17f
-            setTextColor(INK)
-            setPadding(0, pad, 0, (8 * dp).toInt())
-        })
+        column.addView(Ui.text(this, "Try it here", 17f).apply { setPadding(0, pad, 0, (8 * dp).toInt()) })
         column.addView(EditText(this).apply {
             hint = "Tap here, then tap the microphone on the Quoth keyboard"
             minLines = 4
@@ -91,15 +77,46 @@ class MainActivity : Activity() {
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         })
 
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(PAPER)
+        column.addView(Ui.text(this, "Make it yours", 17f).apply { setPadding(0, pad, 0, (8 * dp).toInt()) })
+        for ((title, about, screen) in listOf(
+            Triple("History", "Your recent dictations", HistoryScreen::class.java),
+            Triple("Dictionary", "Names and words to spell your way", DictionaryScreen::class.java),
+            Triple("Snippets", "Short phrases that type longer text", SnippetsScreen::class.java),
+            Triple("Style", "Capitals and punctuation per kind of app", StyleScreen::class.java),
+            Triple("Settings", "Clean-up, models, languages, history", SettingsScreen::class.java),
+        )) {
+            column.addView(Ui.card(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(Ui.text(context, title))
+                    addView(Ui.text(context, about, 13f, Ui.MUTED))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Ui.text(context, "›", 22f, Ui.MUTED))
+                isClickable = true
+                contentDescription = title
+                setOnClickListener { startActivity(Intent(context, screen)) }
+            }, Ui.gap(this, 8))
+        }
+
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Ui.PAPER)
             addView(column)
-        })
+        }
+        Ui.fitSystemBars(scroll, pad)
+        setContentView(scroll)
     }
 
     override fun onResume() {
         super.onResume()
+        unlisten = Downloads.listen { refresh() }
         refresh()
+    }
+
+    override fun onPause() {
+        unlisten?.invoke()
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -117,62 +134,36 @@ class MainActivity : Activity() {
         val ours = imm.enabledInputMethodList.firstOrNull { it.packageName == packageName }
         val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         micStep.done = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (Speech.model.file !in downloading) modelStep.done = Speech.isModelInstalled(this)
-        if (Speech.cleanupModel(this).file !in downloading) cleanupStep.done = Speech.isCleanupInstalled(this)
-        enableStep.done = ours != null
-        switchStep.done = ours != null && current == ours.id
-    }
-
-    private fun download(model: ModelFile, step: Step) {
-        if (!downloading.add(model.file)) return
-        step.button.isEnabled = false
-        step.button.text = "Downloading…"
-        step.progress.visibility = View.VISIBLE
-        thread(name = "quoth-download") {
-            val error = runCatching {
-                Speech.downloader(this).download(model) { have, total ->
-                    runOnUiThread { step.progress.progress = (have * 1000 / total).toInt() }
-                }
-            }.exceptionOrNull()
-            runOnUiThread {
-                downloading.remove(model.file)
-                step.progress.visibility = View.GONE
-                step.button.isEnabled = true
-                step.button.text = if (error == null) "Download" else "Try again"
-                if (error != null) step.detail("Download stopped: ${error.message}. It will continue where it left off.")
-                refresh()
-                if (error == null) Speech.warmUp(this)
+        modelStep.show(Speech.model, Speech.isModelInstalled(this))
+        val cleanup = Speech.cleanupModel(this)
+        cleanupStep.view.visibility = if (cleanup == null) View.GONE else View.VISIBLE
+        if (cleanup != null) {
+            cleanupStep.title.text = "3. Download the clean-up model (%.1f GB)".format(cleanup.bytes / 1e9)
+            cleanupStep.show(cleanup, Speech.isInstalled(this, cleanup))
+            if (!cleanupStep.done && Downloads.state(cleanup) == null) {
+                cleanupStep.detail("Optional. Removes ums, applies corrections and fixes punctuation. Best on Wi-Fi.")
             }
         }
+        enableStep.done = ours != null
+        switchStep.done = ours != null && current == ours.id
+        // Once everything needed is done, setup folds away (the optional clean-up step stays until it's downloaded).
+        val essentials = micStep.done && modelStep.done && enableStep.done && switchStep.done
+        for (s in listOf(micStep, modelStep, enableStep, switchStep)) s.view.visibility = if (essentials) View.GONE else View.VISIBLE
+        if (essentials && cleanupStep.done) cleanupStep.view.visibility = View.GONE
+        ready.visibility = if (essentials) View.VISIBLE else View.GONE
     }
 
     /** One setup row: a label and a button that turns into a tick once the step is done. */
-    private inner class Step(label: String, action: String, onClick: () -> Unit) {
+    private inner class Step(label: String, private val action: String, onClick: () -> Unit) {
         private val dp = resources.displayMetrics.density
-        private val title = TextView(this@MainActivity).apply {
-            text = label
-            textSize = 16f
-            setTextColor(INK)
-        }
-        private val note = TextView(this@MainActivity).apply {
-            textSize = 13f
-            setTextColor(MUTED)
-            visibility = View.GONE
-        }
-        private val tick = TextView(this@MainActivity).apply {
-            text = "✓"
-            textSize = 22f
-            setTextColor(GREEN)
-            contentDescription = "Done"
-        }
-        val progress = ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+        val title: TextView = Ui.text(this@MainActivity, label)
+        private val note = Ui.text(this@MainActivity, "", 13f, Ui.MUTED).apply { visibility = View.GONE }
+        private val tick = Ui.text(this@MainActivity, "✓", 22f, Ui.GREEN).apply { contentDescription = "Done" }
+        private val progress = ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 1000
             visibility = View.GONE
         }
-        val button = Button(this@MainActivity).apply {
-            text = action
-            setOnClickListener { onClick() }
-        }
+        val button: Button = Ui.button(this@MainActivity, action, primary = true) { onClick() }
         val view = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, (8 * dp).toInt(), 0, (8 * dp).toInt())
@@ -199,12 +190,20 @@ class MainActivity : Activity() {
             note.text = text
             note.visibility = View.VISIBLE
         }
-    }
 
-    companion object {
-        private val PAPER = Color.parseColor("#F4EFE6")
-        private val INK = Color.parseColor("#1F1E1C")
-        private val MUTED = Color.parseColor("#6B675F")
-        private val GREEN = Color.parseColor("#2F5D45")
+        /** Shows a model download's state: done, running (with progress), failed, or not started. */
+        fun show(model: ModelFile, installed: Boolean) {
+            val dl = Downloads.state(model)
+            done = installed
+            progress.visibility = if (dl?.running == true) View.VISIBLE else View.GONE
+            if (dl?.running == true) progress.progress = (dl.have * 1000 / dl.total).toInt()
+            button.isEnabled = dl?.running != true
+            button.text = when {
+                dl?.running == true -> "Downloading…"
+                dl?.error != null -> "Try again"
+                else -> action
+            }
+            dl?.error?.let { detail("Download stopped: $it. It will continue where it left off.") }
+        }
     }
 }

@@ -12,7 +12,7 @@ object TranscriptFilter {
 
     /** Removes whisper's non-speech tags, and (for near-silent audio) its stock hallucinations. */
     fun clean(text: String, likelySilence: Boolean = false): String {
-        val s = text.re("""\[[^\]]*\]|\((?:music|silence|applause|laughs?|inaudible|blank_audio)[^)]*\)""", "", ignoreCase = true)
+        val s = text.re("""\[[^\]]*\]|\((?:music|silence|applause|laughs?|inaudible|blank_audio|(?:speaking in )?(?:a )?foreign language)[^)]*\)""", "", ignoreCase = true)
             .re("""\s+""", " ").trim()
         if (likelySilence && s.lowercase() in hallucinations) return ""
         return s

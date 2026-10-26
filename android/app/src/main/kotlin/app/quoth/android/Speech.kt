@@ -7,11 +7,11 @@ import app.quoth.core.CleanupContext
 import app.quoth.core.CleanupLevel
 import app.quoth.core.DictationOutcome
 import app.quoth.core.DictationPipeline
+import app.quoth.core.HistoryEntry
 import app.quoth.core.ModelBench
 import app.quoth.core.ModelCatalog
 import app.quoth.core.ModelDownloader
 import app.quoth.core.ModelFile
-import app.quoth.core.PersonalData
 import app.quoth.core.Transcriber
 import app.quoth.core.TranscriptionResult
 import java.io.File
@@ -19,12 +19,10 @@ import java.util.concurrent.Executors
 
 /**
  * App-wide dictation state: the models on disk, the loaded engines, and one background thread
- * that runs the pipeline (whisper.cpp, then the llama.cpp cleanup model when it's downloaded).
+ * that runs the pipeline (whisper.cpp, then the llama.cpp cleanup model when one is chosen and downloaded).
  */
 object Speech {
     val model = ModelCatalog.whisperBase
-    /** Qwen 3.5 2B: ~1.5 s per dictation on a Pixel 9a (p90 2.8 s). Qwen 3.5 4B is better but 2–3× slower and needs ~3.6 GB of RAM. */
-    val defaultCleanupModel = ModelCatalog.qwen35_2b
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "quoth-speech") }
     private var whisper: WhisperEngine? = null
     private var llama: LlamaEngine? = null
@@ -37,32 +35,50 @@ object Speech {
     fun modelDir(context: Context) = File(context.filesDir, "models")
     fun downloader(context: Context) = ModelDownloader(modelDir(context))
     fun isModelInstalled(context: Context) = downloader(context).isInstalled(model)
+    fun isInstalled(context: Context, m: ModelFile) = downloader(context).isInstalled(m)
 
-    /** The cleanup model in use. Debug builds can pick another catalog model by writing its file name to files/debug-cleanup-model. */
-    fun cleanupModel(context: Context): ModelFile {
+    /**
+     * The cleanup model chosen in Settings (Qwen 3.5 2B by default), or null for none. Debug builds can
+     * test another catalog model by writing its file name to files/debug-cleanup-model.
+     */
+    fun cleanupModel(context: Context): ModelFile? {
         if (BuildConfig.DEBUG) {
             val name = File(context.filesDir, "debug-cleanup-model").takeIf { it.exists() }?.readText()?.trim()
             ModelCatalog.cleanup.firstOrNull { it.file == name }?.let { return it }
         }
-        return defaultCleanupModel
+        return Store.settings(context).cleanup
     }
 
-    fun isCleanupInstalled(context: Context) = downloader(context).isInstalled(cleanupModel(context))
+    fun isCleanupInstalled(context: Context) = cleanupModel(context)?.let { isInstalled(context, it) } ?: false
 
     /** Debug builds only: if this WAV exists, it's transcribed instead of the microphone (for automated tests). */
     fun debugInput(context: Context): File? =
         if (BuildConfig.DEBUG) File(context.filesDir, "debug-input.wav").takeIf { it.exists() } else null
 
-    /** Runs the whole pipeline on the background thread and delivers the outcome (or null on failure), off the main thread. */
+    /**
+     * Runs the whole pipeline on the background thread and delivers the outcome (or null on failure), off the
+     * main thread. [target] says where the text goes; the user's settings and personal data are added here.
+     */
     fun dictate(context: Context, samples: FloatArray, target: CleanupContext, done: (DictationOutcome?) -> Unit) {
-        val appContext = context.applicationContext
+        val app = context.applicationContext
         worker.execute {
             val result = runCatching {
-                val pipeline = pipeline(appContext)
-                val level = if (pipeline.cleaner != null) CleanupLevel.LIGHT else CleanupLevel.NONE
-                pipeline.run(samples, level, emptyList(), target, PersonalData()).also {
-                    Log.i(TAG, "timing asr=${it.asrMs}ms llm=${it.llmMs}ms audio=${samples.size * 1000L / Recorder.RATE}ms" +
-                        " level=${level.raw}" + (it.fallbackReason?.let { r -> " fallback=$r" } ?: ""))
+                val settings = Store.settings(app)
+                val personal = Store.personal(app)
+                val pipeline = pipeline(app, settings.languages)
+                val level = if (pipeline.cleaner != null) settings.level else CleanupLevel.NONE
+                val ctx = target.copy(
+                    variant = settings.variant,
+                    vocabulary = personal.vocabulary(),
+                    textBeforeCursor = target.textBeforeCursor.takeIf { settings.contextAwareness },
+                    textAfterCursor = target.textAfterCursor.takeIf { settings.contextAwareness },
+                )
+                // A single pinned language goes straight to whisper; a set is handled by the transcriber below.
+                val pinned = settings.languages.takeIf { it.size == 1 } ?: emptyList()
+                pipeline.run(samples, level, pinned, ctx, personal).also { o ->
+                    Log.i(TAG, "timing asr=${o.asrMs}ms llm=${o.llmMs}ms audio=${samples.size * 1000L / Recorder.RATE}ms" +
+                        " level=${level.raw} lang=${o.language}" + (o.fallbackReason?.let { r -> " fallback=$r" } ?: ""))
+                    record(app, o, target.bundleID)
                 }
             }
             result.exceptionOrNull()?.let { Log.e(TAG, "dictation failed", it) }
@@ -70,14 +86,23 @@ object Speech {
         }
     }
 
+    /** Saves the dictation to History (per the retention setting) and counts dictionary uses. */
+    private fun record(app: Context, o: DictationOutcome, pkg: String?) {
+        if (o.final.isBlank()) return
+        Store.updatePersonal(app) { it.countingUses(o.firedEntries) }
+        val label = pkg?.let { runCatching { app.packageManager.run { getApplicationLabel(getApplicationInfo(it, 0)).toString() } }.getOrNull() }
+        Store.history(app).add(HistoryEntry(createdAt = System.currentTimeMillis(), raw = o.raw, final = o.final.trim(), app = pkg,
+            appName = label, asrMs = o.asrMs, llmMs = o.llmMs, fallbackReason = o.fallbackReason), Store.settings(app).retention)
+    }
+
     /** Loads the engines in the background so the first dictation doesn't wait, and primes the cleanup prompt cache. */
     fun warmUp(context: Context) {
-        val appContext = context.applicationContext
+        val app = context.applicationContext
         warming = true
         worker.execute {
             try {
-                if (isModelInstalled(appContext)) {
-                    runCatching { pipeline(appContext).cleaner?.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
+                if (isModelInstalled(app)) {
+                    runCatching { pipeline(app, emptyList()).cleaner?.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
                 }
             } finally {
                 warming = false
@@ -89,13 +114,20 @@ object Speech {
     @Volatile var warming = false
         private set
 
-    /** Must run on the worker thread. Loads whatever models are installed, and drops a cleanup model that was swapped. */
-    private fun pipeline(context: Context): DictationPipeline {
+    /** Unloads a cleanup model (before it's deleted, or when another is chosen) and waits until that's done. */
+    fun release(file: String) {
+        worker.submit {
+            if (llamaFile == file) { llama?.close(); llama = null; llamaFile = null }
+        }.get()
+    }
+
+    /** Must run on the worker thread. Loads whatever models are chosen and installed, and drops a cleanup model that was swapped. */
+    private fun pipeline(context: Context, languages: List<String>): DictationPipeline {
         val w = whisper ?: WhisperEngine.load(File(modelDir(context), model.file))?.also { whisper = it }
             ?: error("speech model failed to load")
-        val cm = cleanupModel(context)
-        if (llamaFile != cm.file) { llama?.close(); llama = null; llamaFile = null }
-        if (llama == null && downloader(context).isInstalled(cm)) {
+        val cm = cleanupModel(context)?.takeIf { isInstalled(context, it) }
+        if (llamaFile != cm?.file) { llama?.close(); llama = null; llamaFile = null }
+        if (llama == null && cm != null) {
             val t0 = System.currentTimeMillis()
             // Debug builds: files/debug-no-repack keeps the weights memory-mapped (for measuring RAM use against speed).
             val repack = !(BuildConfig.DEBUG && File(context.filesDir, "debug-no-repack").exists())
@@ -105,25 +137,32 @@ object Speech {
             Log.i(TAG, "cleanup model ${cm.name} loaded in ${System.currentTimeMillis() - t0}ms: ${llama != null}")
         }
         val asr = Transcriber { samples, language, prompt ->
-            TranscriptionResult(w.transcribe(samples, language ?: "auto", prompt ?: ""))
+            val text = w.transcribe(samples, language ?: "auto", prompt ?: "")
+            val heard = w.lastLanguage
+            if (language == null && languages.size > 1 && heard != null && heard !in languages) {
+                // Detected a language outside the user's set: transcribe again in their first language.
+                TranscriptionResult(w.transcribe(samples, languages[0], prompt ?: ""), languages[0])
+            } else {
+                TranscriptionResult(text, heard)
+            }
         }
         return DictationPipeline(asr, llama, LLM_TIMEOUT, LLM_SECONDS_PER_WORD)
     }
 
     /** Debug builds only: scores the cleanup model on files/cleanup-golden.jsonl, logging the same lines as `:core:eval`. */
     fun runEvals(context: Context) {
-        val appContext = context.applicationContext
-        val file = File(appContext.filesDir, "cleanup-golden.jsonl")
+        val app = context.applicationContext
+        val file = File(app.filesDir, "cleanup-golden.jsonl")
         if (!BuildConfig.DEBUG || !file.exists()) return
         worker.execute {
-            val cleaner = pipeline(appContext).cleaner ?: run { Log.i(TAG, "eval: no cleanup model"); return@execute }
-            val name = cleanupModel(appContext).name
+            val cleaner = pipeline(app, emptyList()).cleaner ?: run { Log.i(TAG, "eval: no cleanup model"); return@execute }
+            val name = cleanupModel(app)?.name ?: "?"
             // Fill the prompt cache first, without a timeout, as the keyboard's warm-up does.
             val t0 = System.currentTimeMillis()
             runCatching { cleaner.clean("hello", CleanupLevel.LIGHT, CleanupContext()) }
             Log.i(TAG, "eval warm-up ${System.currentTimeMillis() - t0}ms")
             val cases = CleanupCase.load(file.readText())
-            val out = File(appContext.filesDir, "eval-results.log").apply { writeText("") }
+            val out = File(app.filesDir, "eval-results.log").apply { writeText("") }
             val results = ModelBench.runCleanup(cleaner, name, cases, timeout = 120.0) { r ->
                 val line = "eval ${r.verdict.symbol} ${r.caseID} ${r.ms}ms ${r.verdict.problems.joinToString(", ")} | ${r.output.replace("\n", "⏎")}"
                 Log.i(TAG, line)

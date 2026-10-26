@@ -9,9 +9,14 @@ class WhisperEngine private constructor(private var ctx: Long) : AutoCloseable {
     @Synchronized
     fun transcribe(samples: FloatArray, language: String = "auto", prompt: String = ""): String {
         check(ctx != 0L) { "engine closed" }
-        val bytes = nativeTranscribe(ctx, samples, language, prompt, threads()) ?: return ""
-        return String(bytes, Charsets.UTF_8).trim()
+        val bytes = nativeTranscribe(ctx, samples, language, prompt, threads())
+        lastLanguage = nativeLanguage(ctx).takeIf { it.isNotEmpty() }
+        return bytes?.let { String(it, Charsets.UTF_8).trim() } ?: ""
     }
+
+    /** The language of the last transcription, as detected (language "auto") or pinned. */
+    var lastLanguage: String? = null
+        private set
 
     @Synchronized
     override fun close() {
@@ -33,5 +38,6 @@ class WhisperEngine private constructor(private var ctx: Long) : AutoCloseable {
         @JvmStatic private external fun nativeFree(ctx: Long)
         @JvmStatic private external fun nativeTranscribe(ctx: Long, samples: FloatArray, language: String, prompt: String, threads: Int): ByteArray?
         @JvmStatic private external fun nativeSystemInfo(): String
+        @JvmStatic private external fun nativeLanguage(ctx: Long): String
     }
 }

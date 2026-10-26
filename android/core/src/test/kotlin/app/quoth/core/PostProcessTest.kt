@@ -45,6 +45,8 @@ class SanitizerTest {
         assertEquals("hello world", TranscriptFilter.clean(" hello [Music] world "))
         assertEquals("", TranscriptFilter.clean("Thank you.", likelySilence = true))
         assertEquals("Thank you.", TranscriptFilter.clean("Thank you."))
+        // Whisper's note when it's forced into a language the speaker isn't using.
+        assertEquals("", TranscriptFilter.clean("(speaking in foreign language)"))
     }
 
     @Test fun audioLevel() {

@@ -10,7 +10,7 @@ model the text is Whisper's, with the Mac app's spoken-punctuation and style rul
 | Module | What |
 | --- | --- |
 | `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
-| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (setup), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
+| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (home: setup, try-it box, links to the screens), `PersonalScreens.kt` (History, Dictionary, Snippets, Style), `SettingsScreens.kt` (Settings, Models), `Store` (settings.json, personal.json, history.json in the app's files), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
 | `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone) |
 
 ## Build and test (macOS)
@@ -55,3 +55,4 @@ normally a `llama-server` on the Mac. To compare with the Swift version, point b
   30 s window. 4 threads is fastest; q5_1/q8_0 models are no faster, and a shortened `audio_ctx` is 3–4× faster
   but drops or garbles words, so neither is used.
 - Kotlin regexes go through `Rx` (Text.kt) so `\b`, `\w` and `\s` are Unicode-aware on the JVM as on Android and the Mac.
+- If `uiautomator dump` keeps failing with "null root node" on a phone, its accessibility connection is stuck (seen after an app crash during a test); restarting the phone fixes it. The e2e script stops instead of using a stale dump.

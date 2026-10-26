@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Only for downloading the speech model. -->
+    <!-- Only for downloading the models. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -21,6 +21,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".HistoryScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".DictionaryScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SnippetsScreen" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".StyleScreen" android:exported="false" />
+        <activity android:name=".SettingsScreen" android:exported="false" />
+        <activity android:name=".ModelsScreen" android:exported="false" />
 
         <service
             android:name=".QuothKeyboardService"

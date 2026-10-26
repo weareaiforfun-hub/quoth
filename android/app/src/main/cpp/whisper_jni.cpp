@@ -63,6 +63,14 @@ Java_app_quoth_android_WhisperEngine_nativeTranscribe(JNIEnv *env, jclass, jlong
     return out;
 }
 
+// The language of the last transcription ("en", "de"…), as detected or as pinned.
+extern "C" JNIEXPORT jstring JNICALL
+Java_app_quoth_android_WhisperEngine_nativeLanguage(JNIEnv *env, jclass, jlong ctxPtr) {
+    auto *ctx = reinterpret_cast<whisper_context *>(ctxPtr);
+    const int id = ctx ? whisper_full_lang_id(ctx) : -1;
+    return env->NewStringUTF(id >= 0 ? whisper_lang_str(id) : "");
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_app_quoth_android_WhisperEngine_nativeSystemInfo(JNIEnv *env, jclass) {
     return env->NewStringUTF(whisper_print_system_info());
