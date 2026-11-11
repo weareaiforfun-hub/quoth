@@ -297,6 +297,7 @@ dictate_bubble() { # text-to-speak, app expected in front
   read -r x y < <(earshot_window)
   "$ADB" shell input tap "$x" "$y"
   wait_insert
+  "$ADB" logcat -d -s Quoth | grep -q "inserted" || { echo "  (nothing inserted; Quoth's log:)"; "$ADB" logcat -d -s Quoth | grep -v EarshotScene | tail -8; }
 }
 other_ime="$("$ADB" shell ime list -s | tr -d '\r' | grep -v "^$PKG/" | grep -iv voice | head -1)"
 if [ -z "$other_ime" ]; then
