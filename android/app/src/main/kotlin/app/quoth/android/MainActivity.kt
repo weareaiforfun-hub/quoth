@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private lateinit var switchStep: Step
     private lateinit var setup: LinearLayout
     private lateinit var ready: View
+    private val readyHow by lazy { Ui.text(this, "", 14f, Ui.MUTED) }
     private var unlisten: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,8 +61,7 @@ class MainActivity : Activity() {
         }
         ready = Ui.card(this).apply {
             addView(Ui.text(context, "✓ Quoth is ready", 17f, Ui.GREEN))
-            addView(Ui.text(context, "In any app, tap the keyboard button at the bottom right and pick Quoth.", 14f, Ui.MUTED),
-                Ui.gap(context, 2))
+            addView(readyHow, Ui.gap(context, 2))
         }
         column.addView(setup)
         column.addView(ready)
@@ -88,12 +88,14 @@ class MainActivity : Activity() {
 
         column.addView(Ui.text(this, "Make it yours", 17f).apply { setPadding(0, pad, 0, (8 * dp).toInt()) })
         for ((title, about, screen) in listOf(
+            Triple("Earshot", "Keep your keyboard: a floating microphone next to any text box", EarshotScreen::class.java)
+                .takeIf { BuildConfig.EARSHOT },
             Triple("History", "Your recent dictations", HistoryScreen::class.java),
             Triple("Dictionary", "Names and words to spell your way", DictionaryScreen::class.java),
             Triple("Snippets", "Short phrases that type longer text", SnippetsScreen::class.java),
             Triple("Style", "Capitals and punctuation per kind of app", StyleScreen::class.java),
             Triple("Settings", "Clean-up, models, languages, history", SettingsScreen::class.java),
-        )) {
+        ).filterNotNull()) {
             column.addView(Ui.card(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -160,10 +162,14 @@ class MainActivity : Activity() {
         }
         switchStep.done = ours != null && current == ours.id
         // Once everything needed is done, setup folds away (the optional clean-up step stays until it's downloaded).
-        val essentials = micStep.done && modelStep.done && enableStep.done && switchStep.done
+        // Earshot users can keep their own keyboard, so they don't need steps 4 and 5.
+        val earshot = Earshot.working(this)
+        val essentials = micStep.done && modelStep.done && ((enableStep.done && switchStep.done) || earshot)
         for (s in listOf(micStep, modelStep, enableStep, switchStep)) s.view.visibility = if (essentials) View.GONE else View.VISIBLE
         if (essentials && cleanupStep.done) cleanupStep.view.visibility = View.GONE
         ready.visibility = if (essentials) View.VISIBLE else View.GONE
+        readyHow.text = if (earshot && !switchStep.done) "In any app, tap a text box, then the green microphone above your keyboard."
+            else "In any app, tap the keyboard button at the bottom right and pick Quoth."
     }
 
     /** One setup row: a label and a button that turns into a tick once the step is done. */

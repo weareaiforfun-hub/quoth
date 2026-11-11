@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Earshot listens only for focus and window changes (to know when a text box has the cursor and a keyboard is up).
+     It reads the focused box when it needs it, and doesn't ask for key events, gestures or screenshots. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/earshot_description"
+    android:summary="@string/earshot_summary"
+    android:accessibilityEventTypes="typeViewFocused|typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="100"
+    android:isAccessibilityTool="false"
+    android:settingsActivity="app.quoth.android.EarshotScreen" />

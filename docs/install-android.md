@@ -24,7 +24,7 @@ Open **Quoth** from your home screen. The first screen lists the setup steps; ea
 4. **Turn on the Quoth keyboard.** Tap **Open settings**, then switch on **Quoth voice keyboard**. Android shows a warning that a keyboard may collect everything you type. That warning appears for every keyboard. Quoth reads only a little text around the cursor while you dictate, and nothing leaves your phone ([Privacy](privacy-android.md)). Tap **OK**, then go back to Quoth.
 5. **Switch to Quoth.** Tap **Choose keyboard** and pick **Quoth voice keyboard**.
 
-When everything is done, the steps fold away and you see **✓ Quoth is ready**.
+When everything is done, the steps fold away and you see **✓ Quoth is ready**. (Prefer to keep your usual keyboard? Do steps 1 to 3, then turn on Earshot, below, instead of steps 4 and 5.)
 
 ## Step 3: Your first dictation
 
@@ -42,6 +42,24 @@ Quoth works next to your usual keyboard:
 
 Quoth switches itself off in password boxes.
 
+## Keep your keyboard: Earshot (optional)
+
+If you'd rather not switch keyboards, turn on **Earshot**: a small green microphone that floats just above whatever keyboard you use (Gboard, Samsung Keyboard, SwiftKey…), in any app.
+
+1. On Quoth's home screen, tap **Earshot** (or **Settings → Earshot**).
+2. Read **Before you turn it on**. Earshot uses Android's Accessibility setting, because that's the only way Android lets an app put text into other apps. Quoth reads only the text box that has the cursor, never password boxes, and nothing leaves your phone. Tap **Agree and turn on**.
+3. Android's **Accessibility** settings open. Tap **Quoth Earshot** (it may be under **Downloaded apps**), switch on **Use Quoth Earshot**, and tap **Allow**. Android warns that the app can see your screen; that warning appears for every app that uses this setting.
+4. Go back to Quoth. You'll see **✓ Earshot is on**.
+
+To dictate: tap a text box in any app. When your keyboard opens, the green microphone appears just above it. Tap it, speak, and tap it again (it turns red while it listens). The text appears in the box after a second or two.
+
+- **Move it:** drag it. It snaps to the nearer side and remembers the height.
+- **Hide it:** hold it, then choose **Hide for an hour** or **Not in** (this app). Apps you've hidden it in are listed under **Earshot** in Quoth, with **Show here** to bring it back.
+- **It hides by itself** in password boxes and while the Quoth keyboard is up (that has its own microphone).
+- **Turn it off:** Quoth → **Earshot → Turn Earshot off**, or switch off Quoth Earshot in Android's Accessibility settings.
+
+Installed Quoth from an APK file rather than Google Play? On Android 13 and later the switch in step 3 is greyed out at first. Open **Settings → Apps → Quoth**, tap **⋮** (top right), choose **Allow restricted settings**, then try step 3 again.
+
 ## Make it yours
 
 From Quoth's home screen:
@@ -57,5 +75,7 @@ From Quoth's home screen:
 - **The first dictation after restarting the phone says "Getting ready…"** while the models load. That takes a few seconds, once.
 - **The text appears slowly:** the clean-up model needs a fairly recent phone. On an older phone, choose **None** in **Settings → Clean-up model**; dictation then takes only the speech model's couple of seconds.
 - **A download stopped:** tap **Try again**. It continues where it left off.
+- **Earshot doesn't appear:** check that **Earshot** in Quoth says it's on, that the keyboard is open, and that you didn't hide it in that app or for an hour. Some apps report the text box in a way Earshot can't find; use the Quoth keyboard there.
+- **Earshot says "Copied: paste it":** the box didn't accept the text directly (or the box closed while Quoth was writing). The text is on the clipboard: hold the box and tap **Paste**.
 
 Questions or problems: [arian.shafa.analytics@gmail.com](mailto:arian.shafa.analytics@gmail.com).

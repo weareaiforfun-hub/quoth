@@ -15,6 +15,10 @@ val uploadPassword: String? = System.getenv("QUOTH_UPLOAD_PASSWORD") ?: if (uplo
     }.standardOutput.asText.get().trim().ifEmpty { null }
 } else null
 
+// Earshot (the floating bubble, an accessibility service) is in every build unless -Pquoth.earshot=false, which builds
+// the keyboard-only app: the service is removed from the manifest and the app hides Earshot's screens.
+val earshot = providers.gradleProperty("quoth.earshot").orNull != "false"
+
 android {
     namespace = "app.quoth.android"
     compileSdk = 36
@@ -27,6 +31,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         ndk { abiFilters += "arm64-v8a" }
+        buildConfigField("boolean", "EARSHOT", earshot.toString())
         externalNativeBuild {
             cmake {
                 arguments += listOf(
@@ -71,6 +76,9 @@ android {
     }
 
     buildFeatures { buildConfig = true }
+
+    // Merged over the main manifest in both build types (a build type's manifest takes priority over main's).
+    if (!earshot) for (type in listOf("debug", "release")) sourceSets.getByName(type).manifest.srcFile("src/noEarshot/AndroidManifest.xml")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

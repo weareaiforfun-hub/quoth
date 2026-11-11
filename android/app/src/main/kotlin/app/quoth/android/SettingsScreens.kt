@@ -56,6 +56,15 @@ class SettingsScreen : Screen() {
                 }.show()
         })
 
+        if (BuildConfig.EARSHOT) {
+            section("Earshot")
+            add(navRow("Floating microphone", if (Earshot.working(this)) "On" else "Off") {
+                startActivity(Intent(this, EarshotScreen::class.java))
+            })
+            add(Ui.text(this, "Dictate while keeping your usual keyboard: a small Quoth microphone appears next to the text box.",
+                13f, Ui.MUTED), 4)
+        }
+
         section("History")
         add(Ui.card(this).apply {
             val all = Retention.entries

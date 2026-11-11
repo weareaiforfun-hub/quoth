@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
-import android.text.InputType
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
@@ -20,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import app.quoth.core.CleanupContext
 import app.quoth.core.FieldKind
+import app.quoth.core.Fields
 import app.quoth.core.StyleCategory
 
 /**
@@ -111,6 +111,22 @@ class QuothKeyboardService : InputMethodService() {
         refresh()
         // Back in a field after using another keyboard: see whether the last dictation was corrected.
         checkForCorrections()
+    }
+
+    // Earshot hides while this keyboard is on screen: it has its own microphone.
+    override fun onWindowShown() {
+        super.onWindowShown()
+        Earshot.quothKeyboardUp = true
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        Earshot.quothKeyboardUp = false
+    }
+
+    override fun onDestroy() {
+        Earshot.quothKeyboardUp = false
+        super.onDestroy()
     }
 
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
@@ -223,33 +239,9 @@ class QuothKeyboardService : InputMethodService() {
     }
 
     /** One-line fields, search boxes and subject lines, from what the app says about the field. */
-    private fun fieldKind(info: EditorInfo): FieldKind {
-        val type = info.inputType
-        if (type and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return FieldKind.NORMAL
-        val variation = type and InputType.TYPE_MASK_VARIATION
-        val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
-        return when {
-            variation == InputType.TYPE_TEXT_VARIATION_URI || variation == InputType.TYPE_TEXT_VARIATION_FILTER ||
-                variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-                (action == EditorInfo.IME_ACTION_SEARCH || action == EditorInfo.IME_ACTION_GO) &&
-                type and InputType.TYPE_TEXT_FLAG_MULTI_LINE == 0 -> FieldKind.SEARCH
-            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_SUBJECT -> FieldKind.SUBJECT
-            type and InputType.TYPE_TEXT_FLAG_MULTI_LINE == 0 -> FieldKind.SINGLE_LINE
-            else -> FieldKind.NORMAL
-        }
-    }
+    private fun fieldKind(info: EditorInfo): FieldKind = Fields.kind(info.inputType, info.imeOptions and EditorInfo.IME_MASK_ACTION)
 
-    private fun isPasswordField(info: EditorInfo): Boolean {
-        val cls = info.inputType and InputType.TYPE_MASK_CLASS
-        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
-        return when (cls) {
-            InputType.TYPE_CLASS_TEXT -> variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
-            InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            else -> false
-        }
-    }
+    private fun isPasswordField(info: EditorInfo) = Fields.isPassword(info.inputType)
 
     companion object {
         private val PAPER = Color.parseColor("#F4EFE6")

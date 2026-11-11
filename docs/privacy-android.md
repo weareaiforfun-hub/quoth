@@ -1,6 +1,6 @@
 # Quoth for Android: privacy policy
 
-*Effective 26 October 2026. Applies to the Quoth voice keyboard for Android (package `app.quoth`).*
+*Effective 26 October 2026, updated 11 November 2026 (Earshot). Applies to Quoth for Android (package `app.quoth`): the Quoth voice keyboard and Earshot, its optional floating microphone.*
 
 **Short version:** Quoth turns your speech into text on your phone. Your voice and your text never leave the phone. Quoth has no accounts, no ads, no analytics and no tracking, and the developer receives no data from it.
 
@@ -8,11 +8,23 @@
 
 | What | When | Why | Leaves the phone? |
 | --- | --- | --- | --- |
-| Microphone audio | Only from when you tap the microphone on the Quoth keyboard until you tap it again | To turn your speech into text | No. It's processed in memory and never saved |
+| Microphone audio | Only from when you tap the microphone (on the Quoth keyboard or Earshot) until you tap it again | To turn your speech into text | No. It's processed in memory and never saved |
 | A little of the text around the cursor in the box you're typing in, and that app's name | When you dictate, unless you turn it off (Style → Context) | To continue sentences naturally and match the app's writing style | No |
 | The box's text again after Quoth inserts text | While the box is open, if "Learn names when I correct a dictation" is on (Dictionary) | To notice a name you corrected and add it to your Dictionary | No |
 
-Quoth never works in password boxes. Where an app asks keyboards not to remember anything (for example an incognito tab), Quoth keeps no History and learns nothing.
+Quoth never works in password boxes. Where an app asks keyboards not to remember anything (for example an incognito tab), the Quoth keyboard keeps no History and learns nothing.
+
+### Earshot (optional, off unless you turn it on; in versions of Quoth that include it)
+
+Earshot shows a small Quoth microphone above whatever keyboard you use, so you can dictate without switching keyboards. It uses Android's Accessibility service, because that's the only way Android lets an app see and fill a text box in another app. Quoth isn't an accessibility tool, and before you turn Earshot on, Quoth shows you what it reads and asks you to agree.
+
+| What | When | Why | Leaves the phone? |
+| --- | --- | --- | --- |
+| Which text box has the cursor, what kind of box it is, which app it's in, and whether a keyboard is open | While Earshot is on: Android tells Earshot when the focus or the windows on screen change. To find the box, Earshot looks through the screen's layout; it keeps none of it | To show the microphone only while you're typing, and never in password boxes | No |
+| The box's text near the cursor | When you tap Earshot's microphone, unless you turn context off (Style → Context) | To continue sentences naturally and match the app's style | No |
+| The box's text after inserting, and again when you come back to the box | After a dictation, if "Learn names when I correct a dictation" is on (Dictionary) | To notice a name you corrected and add it to your Dictionary | No |
+
+Earshot never reads or fills password boxes, doesn't record what you type, and only types when you tap its microphone. If a box doesn't accept text directly, Earshot pastes it, which leaves the dictated text on the clipboard. Android doesn't tell accessibility services when an app asks not to remember anything (incognito tabs), so Earshot can't leave those dictations out of History the way the keyboard does; set History to **Never store** if that matters to you. Turn Earshot off in Quoth (Earshot → Turn Earshot off) or in Android's Accessibility settings.
 
 ## What's stored on your phone
 
@@ -37,6 +49,7 @@ Only the model downloads. When you tap **Download** in setup or on the Models sc
 | --- | --- |
 | Microphone | Recording while you dictate |
 | Internet | Downloading the models, only when you ask for them |
+| Accessibility service (Earshot) | Only if you turn Earshot on: finding the text box with the cursor and putting your dictation into it, as described above |
 
 You can turn off the microphone permission any time in Android Settings → Apps → Quoth → Permissions.
 

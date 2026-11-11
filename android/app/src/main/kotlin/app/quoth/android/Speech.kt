@@ -93,7 +93,7 @@ object Speech {
         if (o.final.isBlank()) return
         Store.updatePersonal(app) { it.countingUses(o.firedEntries) }
         if (!keepHistory) return
-        val label = pkg?.let { runCatching { app.packageManager.run { getApplicationLabel(getApplicationInfo(it, 0)).toString() } }.getOrNull() }
+        val label = pkg?.let { Apps.label(app, it) }
         Store.history(app).add(HistoryEntry(createdAt = System.currentTimeMillis(), raw = o.raw, final = o.final.trim(), app = pkg,
             appName = label, asrMs = o.asrMs, llmMs = o.llmMs, fallbackReason = o.fallbackReason), Store.settings(app).retention)
     }

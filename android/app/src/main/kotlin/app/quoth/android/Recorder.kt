@@ -1,7 +1,9 @@
 package app.quoth.android
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import java.io.File
@@ -40,6 +42,16 @@ class Recorder {
             }
         }
         return true
+    }
+
+    /**
+     * True when Android is feeding this recording silence (it does that to apps it doesn't count as in use, instead
+     * of failing), false when it's real, null when unknown.
+     */
+    fun silenced(context: Context): Boolean? {
+        val id = record?.audioSessionId ?: return null
+        return context.getSystemService(AudioManager::class.java).activeRecordingConfigurations
+            .firstOrNull { it.clientAudioSessionId == id }?.isClientSilenced
     }
 
     /** Stops and returns the recording as floats in [-1, 1]. */

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The keyboard-only build (-Pquoth.earshot=false): merged over the main manifest, it removes Earshot's
+     accessibility service and screen. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity android:name=".EarshotScreen" tools:node="remove" />
+        <service android:name=".EarshotService" tools:node="remove" />
+    </application>
+</manifest>

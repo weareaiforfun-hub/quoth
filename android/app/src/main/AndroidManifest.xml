@@ -29,6 +29,8 @@
         <activity android:name=".StyleScreen" android:exported="false" />
         <activity android:name=".SettingsScreen" android:exported="false" />
         <activity android:name=".ModelsScreen" android:exported="false" />
+        <!-- Exported only so Android's Accessibility settings can open it (the service's settings activity). -->
+        <activity android:name=".EarshotScreen" android:exported="true" />
 
         <service
             android:name=".QuothKeyboardService"
@@ -39,6 +41,18 @@
                 <action android:name="android.view.InputMethod" />
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/method" />
+        </service>
+
+        <!-- Earshot, the optional floating dictation bubble (off until the user agrees to the disclosure in EarshotScreen). -->
+        <service
+            android:name=".EarshotService"
+            android:exported="true"
+            android:label="@string/earshot_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/earshot_service" />
         </service>
     </application>
 </manifest>

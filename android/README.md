@@ -1,6 +1,7 @@
 # Quoth for Android
 
-A voice keyboard: tap the microphone, speak, and the text goes into whatever app you're typing in.
+A voice keyboard: tap the microphone, speak, and the text goes into whatever app you're typing in. Or, with any other
+keyboard, Earshot: an optional floating microphone (an accessibility service) that does the same.
 Everything runs on the phone: whisper.cpp turns speech into text, then (once its model is downloaded) a small
 language model in llama.cpp cleans it up with the same prompt and rules as the Mac app. Without the cleanup
 model the text is Whisper's, with the Mac app's spoken-punctuation and style rules applied.
@@ -10,7 +11,7 @@ model the text is Whisper's, with the Mac app's spoken-punctuation and style rul
 | Module | What |
 | --- | --- |
 | `core/` | Platform-neutral Kotlin (no Android): a port of the Mac's `Sources/QuothCore` cleanup (prompt, pipeline, rules, personal data) and model downloads. Tests run on the JVM; `src/eval` is the golden-eval runner |
-| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `MainActivity` (home: setup, try-it box, links to the screens), `PersonalScreens.kt` (History, Dictionary, Snippets, Style), `SettingsScreens.kt` (Settings, Models), `Store` (settings.json, personal.json, history.json in the app's files), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
+| `app/` | The Android app: `QuothKeyboardService` (the keyboard), `EarshotService` + `EarshotBubble` + `EarshotScreen` (the floating microphone, its overlay, and its disclosure and settings), `MainActivity` (home: setup, try-it box, links to the screens), `PersonalScreens.kt` (History, Dictionary, Snippets, Style), `SettingsScreens.kt` (Settings, Models), `Store` (settings.json, personal.json, history.json in the app's files), `Speech` (runs the pipeline), `WhisperEngine` + `LlamaEngine` + `src/main/cpp` (JNI bridges to whisper.cpp and llama.cpp, one `libquoth.so` sharing llama.cpp's ggml) |
 | `scripts/` | `fetch-engines.sh` (pinned whisper.cpp and llama.cpp sources), `e2e-emulator.sh` (end-to-end check), `eval-device.sh` (golden evals on a phone), `make-wordlist.py` (auto-learn's word list), `store-assets.swift` and `store-screenshots.sh` (Play Store graphics) |
 
 ## Build and test (macOS)
@@ -24,7 +25,8 @@ scripts/fetch-engines.sh
 ./gradlew :core:test :app:assembleDebug
 ```
 
-End to end, on a headless emulator (no window opens):
+End to end, on a headless emulator (no window opens). The script also runs Earshot with another keyboard (Gboard on the
+emulator) in Quoth and in Contacts, and puts back the device's keyboard and accessibility settings afterwards:
 
 ```bash
 avdmanager create avd -n quoth-test -k "system-images;android-37.0;google_apis;arm64-v8a" -d pixel_9a
@@ -66,6 +68,16 @@ normally a `llama-server` on the Mac. To compare with the Swift version, point b
   search, address and subject fields also lose the final period. Fields flagged `IME_FLAG_NO_PERSONALIZED_LEARNING`
   (incognito tabs) are left out of History and auto-learn.
 - The e2e script backs up and restores `personal.json` and `history.json`.
+- Earshot (`EarshotService`): an accessibility service that listens only to focus and window changes. It shows its bubble
+  (`TYPE_ACCESSIBILITY_OVERLAY`, so no "draw over other apps" permission) when an editable, non-password box has input
+  focus and a keyboard window is open, and hides while the Quoth keyboard is up. The focus is looked up in the active
+  window, since the global search can land in Gboard's window, and searched downwards when an app reports it on a
+  container (Contacts, a Compose app, reports its whole screen). Text goes in with `ACTION_SET_TEXT` merged at the cursor
+  (`FieldMerge` in core); Compose applies it a moment later, so the box is checked after 500 ms and pasted into only if it
+  didn't change. Field kinds come from the node's input type, multi-line flag and hint (`Fields`). Accessibility doesn't
+  report `IME_FLAG_NO_PERSONALIZED_LEARNING`, so Earshot can't leave incognito tabs out of History (the disclosure says so).
+  Recording from the service wasn't silenced on the emulator (Android 17); if Android hands it silence on some phone,
+  `Recorder.silenced` catches it and the bubble says so. Off by default; `-Pquoth.earshot=false` builds the app without it.
 - Releasing on Google Play: `docs/android-release.md` (upload key, signing file, closed test). Store texts and form answers
   are in `store/`. `./gradlew :app:lintRelease` must report no errors (it caught Android 10 crashes from API 30 inset calls).
 - Android 10 is checked on a second emulator: `avdmanager create avd -n quoth-api29 -k "system-images;android-29;google_apis;arm64-v8a" -d pixel_4`.

@@ -30,6 +30,15 @@ data class AppSettings(
     val retention: Retention = Retention.NORMAL,
     /** Use the text around the cursor to continue sentences naturally. */
     val contextAwareness: Boolean = true,
+    /** Earshot, the floating dictation bubble for other keyboards. Off until the user reads the disclosure and turns it on. */
+    val earshot: Boolean = false,
+    /** Apps where the user hid Earshot ("Not in this app"). */
+    val earshotHiddenApps: List<String> = emptyList(),
+    /** Earshot stays hidden until this time (epoch ms), after "Hide for an hour". */
+    val earshotSnoozedUntil: Long = 0,
+    /** Where the bubble sits: the screen side it snaps to, and its height above the keyboard (dp). */
+    val earshotLeft: Boolean = false,
+    val earshotLift: Int = 12,
 ) {
     val level: CleanupLevel get() = CleanupLevel.of(cleanupLevel) ?: CleanupLevel.LIGHT
     val variant: LanguageVariant get() = LanguageVariant.of(languageVariant) ?: LanguageVariant.NONE
