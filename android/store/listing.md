@@ -26,9 +26,11 @@ WHAT IT DOES
 HOW TO USE IT
 Quoth sits next to your usual keyboard. When you want to dictate, switch to Quoth with the keyboard button, speak, then switch back with one tap.
 
+Or keep your keyboard and turn on Earshot: a small Quoth microphone that floats above any keyboard while you type. Tap it, speak, and the text goes into the box. Earshot is optional and off until you turn it on. It uses Android's Accessibility service only to find the text box you're typing in and put your words into it; Quoth isn't an accessibility tool, it never reads password boxes, and nothing leaves your phone.
+
 PRIVATE BY DESIGN
 • Audio is processed in memory and never saved
-• Quoth never works in password boxes, and keeps nothing from incognito tabs
+• Quoth never works in password boxes, and the keyboard keeps nothing from incognito tabs
 • The only internet use is downloading the AI models, when you ask for them
 
 Free and open source: github.com/weareaiforfun-hub/quoth
@@ -39,5 +41,7 @@ Needs a 64-bit phone with Android 10 or later. The speech model is a 148 MB down
 **Contact email** (shown publicly): Arian's choice. The Mac app uses arian.shafa.analytics@gmail.com.
 **Website:** https://arian-shafa.xyz/quoth/
 **Privacy policy URL:** https://github.com/weareaiforfun-hub/quoth/blob/main/docs/privacy-android.md (live once this branch is merged to main)
+
+If the first release ships without Earshot (the keyboard-only build, see `docs/android-release.md`), leave out the Earshot paragraph until the update that adds it.
 
 **Graphics** (in this folder): `icon-512.png` (app icon), `feature-graphic.png` (1024×500), `screenshots/` (phone, 1080×2160).

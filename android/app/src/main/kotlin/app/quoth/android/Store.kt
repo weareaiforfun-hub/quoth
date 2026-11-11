@@ -97,3 +97,16 @@ object Downloads {
 
     private fun notifyListeners() = main.post { listeners.forEach { it() } }
 }
+
+/** App names for packages. */
+object Apps {
+    private val generic = setOf("android", "app", "apps", "mobile", "client", "lite", "google", "com", "org")
+
+    /**
+     * The app's name, or a readable guess from its package name ("com.google.android.contacts" → "Contacts") when
+     * Android doesn't show Quoth that app (package visibility: an accessibility service can't look other apps up).
+     */
+    fun label(context: Context, pkg: String): String =
+        runCatching { context.packageManager.run { getApplicationLabel(getApplicationInfo(pkg, 0)).toString() } }.getOrNull()
+            ?: pkg.split('.').lastOrNull { it.lowercase() !in generic && it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: pkg
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="earshot_label">Quoth Earshot</string>
+    <string name="earshot_summary">A floating Quoth microphone next to any text box</string>
+    <string name="earshot_description">Earshot puts a small Quoth microphone next to the text box you\'re typing in, so you can dictate while keeping your usual keyboard. To do that, Quoth sees which box has the cursor, what kind of box it is and which app it\'s in, whether a keyboard is open, and, when you dictate, the box\'s text near the cursor so the new words fit in. It then puts the text into the box. Quoth never acts in password boxes. Everything stays on this phone: nothing is sent anywhere. Quoth isn\'t an accessibility tool; Android requires this setting for apps that type into other apps.</string>
+</resources>

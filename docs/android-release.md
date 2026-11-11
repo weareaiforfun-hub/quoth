@@ -23,6 +23,12 @@ Play uses two keys:
 cd android && scripts/fetch-engines.sh && ./gradlew :core:test :app:lintRelease :app:bundleRelease
 ```
 
+For the keyboard-only app, without Earshot's accessibility service (no Accessibility declaration needed), add `-Pquoth.earshot=false`:
+
+```bash
+cd android && ./gradlew :core:test :app:lintRelease :app:bundleRelease -Pquoth.earshot=false
+```
+
 The signed bundle is `app/build/outputs/bundle/release/app-release.aab`. It contains the arm64 native library (16 KB aligned) and its symbol table, so Play shows readable native crash stacks.
 
 Before each release, bump `versionCode` (by 1) and `versionName` in `app/build.gradle.kts`, and run the e2e test on a phone (`scripts/e2e-emulator.sh`, see `android/README.md`).
