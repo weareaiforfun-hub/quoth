@@ -54,8 +54,8 @@ android {
             // The Kotlin code is small next to the native engines and the word list, so R8 isn't worth its risk to JNI.
             isMinifyEnabled = false
             signingConfig = when {
-                uploadPassword != null -> signingConfigs.getByName("upload")
                 providers.gradleProperty("quoth.debugSign").orNull == "true" -> signingConfigs.getByName("debug")
+                uploadPassword != null -> signingConfigs.getByName("upload")
                 else -> null
             }
             // Play shows readable native crash stacks with these.

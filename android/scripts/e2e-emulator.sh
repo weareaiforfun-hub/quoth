@@ -54,6 +54,13 @@ elif cmd == "text":  # print the try-it box's text (empty when only the hint sho
 PY
 ui() { python3 -I "$WORK/ui.py" "$ADB" "$@" || { echo "STOP: can't read the screen"; exit 1; }; }
 
+# Every tap and keystroke goes to whatever is in front, so stop unless it's Quoth (a crash would otherwise
+# leave the test typing into the launcher or another app).
+front() {
+  "$ADB" shell dumpsys window | grep -m1 "mCurrentFocus" | grep -q "$PKG" ||
+    { echo "STOP: Quoth isn't in front ($("$ADB" shell dumpsys window | grep -m1 mCurrentFocus | tr -s ' '))"; exit 1; }
+}
+
 # The mic button lives in the keyboard window, which uiautomator doesn't dump: find it from the keyboard's bounds.
 mic_xy() {
   "$ADB" shell dumpsys window InputMethod | python3 -I -c '
@@ -70,6 +77,7 @@ dictate() { # text-to-speak, expected substring ("" = expect nothing inserted)
   "$ADB" push -q "$WORK/in.wav" /data/local/tmp/in.wav
   "$ADB" shell run-as "$PKG" cp /data/local/tmp/in.wav files/debug-input.wav
   "$ADB" logcat -c
+  front
   read -r x y < <(mic_xy)
   "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"
   for _ in $(seq 1 60); do
@@ -154,6 +162,7 @@ import re, sys
 t, name = sys.argv[1], sys.argv[2]
 m = [x for x in re.finditer(r"[A-Za-z]+", t)][-1]
 print(len(t) - m.start(), t[m.end():].replace(" ", "%s") or "-")' "$t" "$1")
+  front
   "$ADB" shell input keyevent KEYCODE_MOVE_END
   "$ADB" shell input keyevent $(printf 'KEYCODE_DEL %.0s' $(seq 1 "$dels"))
   "$ADB" shell input text "$2${rest#-}"
@@ -196,6 +205,7 @@ w.writeframes(struct.pack('<h', 0) * 32000); w.close()"
 "$ADB" push -q "$WORK/silence.wav" /data/local/tmp/in.wav
 "$ADB" shell run-as "$PKG" cp /data/local/tmp/in.wav files/debug-input.wav
 "$ADB" logcat -c
+front
 read -r x y < <(mic_xy)
 "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 8
 check "silence inserts nothing" "$before_silence"
@@ -230,6 +240,7 @@ else echo "FAIL incognito"; echo "  got: $got, history $n0 -> $(history_count)";
 sleep 3
 ui focus; sleep 2
 "$ADB" logcat -c
+front
 read -r x y < <(mic_xy)
 "$ADB" shell input tap "$x" "$y"; sleep 1; "$ADB" shell input tap "$x" "$y"; sleep 5
 if "$ADB" logcat -d -s Quoth | grep -q timing; then echo "FAIL password box (it transcribed)"; fail=$((fail+1)); else check "password box inserts nothing" ""; fi
