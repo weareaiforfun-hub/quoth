@@ -19,15 +19,13 @@ Play uses two keys:
 
 ## Build
 
-```bash
-cd android && scripts/fetch-engines.sh && ./gradlew :core:test :app:lintRelease :app:bundleRelease
-```
-
-For the keyboard-only app, without Earshot's accessibility service (no Accessibility declaration needed), add `-Pquoth.earshot=false`:
+**Releases are keyboard-only for now** (decided 2026-11-11): the closed test and the first production release leave out Earshot, the floating microphone, so they don't need Play's Accessibility API declaration. `-Pquoth.earshot=false` removes its accessibility service from the manifest and hides its screens:
 
 ```bash
-cd android && ./gradlew :core:test :app:lintRelease :app:bundleRelease -Pquoth.earshot=false
+cd android && scripts/fetch-engines.sh && ./gradlew :core:test :app:lintRelease :app:bundleRelease -Pquoth.earshot=false
 ```
+
+Earshot comes in a later update. Build that one without the flag, and before uploading it fill in the Accessibility API declaration in `android/store/data-safety.md` (it needs a short video), add the listing's Earshot paragraph, and allow for a manual review. Debug builds and the e2e test include Earshot.
 
 The signed bundle is `app/build/outputs/bundle/release/app-release.aab`. It contains the arm64 native library (16 KB aligned) and its symbol table, so Play shows readable native crash stacks.
 
@@ -40,7 +38,7 @@ The build reads the key from `~/.quoth/quoth-upload.jks` and the password from t
 1. **(Arian) Developer account:** sign up at play.google.com/console as a **personal** account and pay the one-time $25. Google checks your identity and asks for a public contact email, and, as you're in the EU, whether you're a trader (DSA). Selling nothing and earning nothing from a hobby app usually means **not a trader**; read Google's wording before answering.
 2. **(Arian) Create the app:** name "Quoth: Private Voice Keyboard", default language English, App, Free. Free can't later become paid.
 3. **Store listing and App content:** paste from `android/store/listing.md` and `android/store/data-safety.md`; upload `android/store/icon-512.png`, `feature-graphic.png` and the screenshots.
-4. **Closed test (required for new personal accounts):** Testing → Closed testing → create a track, upload the `.aab`, add testers by email (a Google Group is easiest). At least **12 testers must stay opted in for 14 days in a row** before Production unlocks; if the count drops below 12 the clock restarts. Testers install from the opt-in link Play gives you. Ask them to really use it (Google checks engagement).
+4. **Closed test (required for new personal accounts):** Testing → Closed testing → create a track, upload the keyboard-only `.aab`, add testers by email (a Google Group is easiest). At least **12 testers must stay opted in for 14 days in a row** before Production unlocks; if the count drops below 12 the clock restarts. Testers install from the opt-in link Play gives you. Ask them to really use it (Google checks engagement).
 5. **Production:** after the 14 days, Play Console offers "Apply for production" with a short questionnaire about the test. Then create a production release with the same `.aab` (or a newer one) and send it for review (usually a few days for a new app).
 
 Every step that publishes something (uploading a release to a track testers can see, sending for review) waits for Arian's go.

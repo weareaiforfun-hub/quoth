@@ -33,7 +33,7 @@ Why each data type is "no":
 | Health | None |
 | COVID-19 contact tracing | No |
 | Data deletion | Not required (no accounts, nothing collected). Users delete History in the app or by uninstalling |
-| Sensitive permissions | **Accessibility API** (Earshot): needs the declaration below. RECORD_AUDIO and INTERNET are ordinary runtime/normal permissions; no SMS, call log, location or "all files" access, and no SYSTEM_ALERT_WINDOW (Earshot's bubble is an accessibility overlay) |
+| Sensitive permissions | **First release (keyboard-only build): none.** From the update that adds Earshot: **Accessibility API**, with the declaration below. RECORD_AUDIO and INTERNET are ordinary runtime/normal permissions; no SMS, call log, location or "all files" access, and no SYSTEM_ALERT_WINDOW (Earshot's bubble is an accessibility overlay) |
 | Foreground service types | None used |
 
 ## Keyboard (input method) notes
@@ -42,6 +42,8 @@ Why each data type is "no":
 - Password boxes are never processed; fields flagged `IME_FLAG_NO_PERSONALIZED_LEARNING` (incognito) are kept out of History and auto-learn.
 
 ## Accessibility API declaration (Earshot)
+
+*For the later update that adds Earshot; the closed test and first release are keyboard-only and don't include the service.*
 
 Play Console → Policy → App content → **Sensitive permissions and APIs** → Accessibility API. Google reviews this by hand and can reject an app, or later remove it, if the use doesn't match the declaration, so the answers must match what the app does. The service is declared with `android:isAccessibilityTool="false"` (`app/src/main/res/xml/earshot_service.xml`).
 
@@ -64,5 +66,5 @@ Play Console → Policy → App content → **Sensitive permissions and APIs** �
 ### Before submitting (risks)
 
 - Google has rejected and removed apps for using the Accessibility API for non-accessibility features. Apps such as voice-typing tools do ship with this declaration, so it's possible, but review may ask for changes or more video.
-- Safer route: ship the closed test without Earshot first (a build with the service removed from the manifest), and add Earshot in a later update with this declaration. A rejection then only holds up the update, not the first release.
+- Chosen route (2026-11-11): the closed test and first release are the keyboard-only build (`-Pquoth.earshot=false`); Earshot follows in an update with this declaration, so a rejection only holds up that update.
 - Sideloaded installs on Android 13+ need "Allow restricted settings" (App info → ⋮) before the service can be switched on; Play installs don't.

@@ -14,7 +14,7 @@
 
 Quoth never works in password boxes. Where an app asks keyboards not to remember anything (for example an incognito tab), the Quoth keyboard keeps no History and learns nothing.
 
-### Earshot (optional, off unless you turn it on)
+### Earshot (optional, off unless you turn it on; in versions of Quoth that include it)
 
 Earshot shows a small Quoth microphone above whatever keyboard you use, so you can dictate without switching keyboards. It uses Android's Accessibility service, because that's the only way Android lets an app see and fill a text box in another app. Quoth isn't an accessibility tool, and before you turn Earshot on, Quoth shows you what it reads and asks you to agree.
 

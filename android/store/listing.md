@@ -42,6 +42,6 @@ Needs a 64-bit phone with Android 10 or later. The speech model is a 148 MB down
 **Website:** https://arian-shafa.xyz/quoth/
 **Privacy policy URL:** https://github.com/weareaiforfun-hub/quoth/blob/main/docs/privacy-android.md (live once this branch is merged to main)
 
-If the first release ships without Earshot (the keyboard-only build, see `docs/android-release.md`), leave out the Earshot paragraph until the update that adds it.
+**The first release ships without Earshot** (the keyboard-only build, see `docs/android-release.md`): paste the description without the "Or keep your keyboard and turn on Earshot" paragraph, and add it in the update that brings Earshot.
 
 **Graphics** (in this folder): `icon-512.png` (app icon), `feature-graphic.png` (1024×500), `screenshots/` (phone, 1080×2160).
