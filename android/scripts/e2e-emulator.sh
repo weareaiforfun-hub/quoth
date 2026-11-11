@@ -48,6 +48,8 @@ if cmd == "focus":   # tap the try-it box
     for t, cls, d, a, b, c, e in nodes():
         if cls == "android.widget.EditText":
             subprocess.run([ADB, "shell", "input", "tap", str((int(a)+int(c))//2), str((int(b)+int(e))//2)]); break
+elif cmd == "has_field":  # exit 0 when the screen has a text box
+    sys.exit(0 if any(cls == "android.widget.EditText" for _, cls, *_ in nodes()) else 1)
 elif cmd == "text":  # print the try-it box's text (empty when only the hint shows)
     import html
     for t, cls, d, *_ in nodes():
@@ -276,7 +278,8 @@ import re, sys
 s = sys.stdin.read()
 i = s.find(" Earshot}:")
 if i < 0: sys.exit()
-m = re.search(r" frame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", s[i:i + 4000])
+# "frame=[…]" on recent Android, "mFrame=[…]" on Android 10.
+m = re.search(r"\b(?:mF|f)rame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]", s[i:i + 4000])
 if m:
     l, t, r, b = map(int, m.groups())
     # The pill grows from the side it sits on; its microphone end is the outer 60 dp or so.
@@ -340,13 +343,18 @@ json.dump(d, open(p, "w"))' "$WORK/settings.json"
     "$ADB" shell am force-stop "$contacts"
     "$ADB" shell am start -a android.intent.action.INSERT -t vnd.android.cursor.dir/contact -p "$contacts" >/dev/null
     sleep 4
-    front "$contacts"; ui focus; sleep 2
+    front "$contacts"
+    if ! python3 -I "$WORK/ui.py" "$ADB" has_field; then
+      echo "SKIP Earshot in Contacts: no text box on its screen (a first-run dialog?)"
+    else
+    ui focus; sleep 2
     if dictate_bubble "Blue Harbor Bakery" "$contacts"; then
       got="$(ui text)"
       # Exactly once (a "set text" that lands late must not be pasted again).
       if [[ "$got" =~ ^Blue\ Harbo(u)?r\ Bakery\.?$ ]]; then echo "PASS Earshot in Contacts ($got)"; pass=$((pass+1))
       else echo "FAIL Earshot in Contacts"; echo "  got: $got"; fail=$((fail+1)); fi
     else echo "FAIL Earshot in Contacts: no bubble"; fail=$((fail+1)); fi
+    fi
     "$ADB" shell am force-stop "$contacts"
   else
     echo "SKIP Earshot in another app: no Contacts app"

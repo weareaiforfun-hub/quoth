@@ -118,6 +118,8 @@ class EarshotService : AccessibilityService() {
     private fun update() {
         if (!::bubble.isInitialized) return
         val settings = Store.settings(this)
+        // Until the user agrees to the disclosure (or after turning Earshot off in Quoth), read nothing at all.
+        if (!settings.earshot || !BuildConfig.EARSHOT) { if (state == State.IDLE) bubble.hide(); return }
         val field = focusedField()
         val keyboard = runCatching { windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrNull()
         val keyboardTop = keyboard?.let { Rect().also(it::getBoundsInScreen).top }

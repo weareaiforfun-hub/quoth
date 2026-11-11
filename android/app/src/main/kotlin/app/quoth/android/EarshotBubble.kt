@@ -112,6 +112,7 @@ class EarshotBubble(
         }
         if (!attached) {
             runCatching { wm.addView(root, params) }.onSuccess { attached = true }
+                .onFailure { android.util.Log.w(Speech.TAG, "earshot: can't show the bubble", it) }
         }
     }
 
@@ -217,6 +218,7 @@ class EarshotBubble(
             y = (screen - params.y).coerceAtLeast(0)
         }
         runCatching { wm.addView(frame, p) }.onSuccess { menuView = frame }
+            .onFailure { android.util.Log.w(Speech.TAG, "earshot: can't show the menu", it) }
     }
 
     private fun closeMenu() {
