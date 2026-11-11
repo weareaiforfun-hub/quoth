@@ -96,6 +96,8 @@ import Testing
         #expect(TranscriptFilter.clean(" hello [Music] world ") == "hello world")
         #expect(TranscriptFilter.clean("Thank you.", likelySilence: true) == "")
         #expect(TranscriptFilter.clean("Thank you.") == "Thank you.")
+        // Whisper's note when it's forced into a language the speaker isn't using.
+        #expect(TranscriptFilter.clean("(speaking in foreign language)") == "")
     }
 }
 

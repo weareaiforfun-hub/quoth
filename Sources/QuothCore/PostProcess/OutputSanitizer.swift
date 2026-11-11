@@ -71,7 +71,7 @@ public enum OutputSanitizer {
 public enum TranscriptFilter {
     /// Removes whisper's non-speech tags, and (for near-silent audio) its stock hallucinations.
     public static func clean(_ text: String, likelySilence: Bool = false) -> String {
-        var s = text.replacingOccurrences(of: "\\[[^\\]]*\\]|\\((?:music|silence|applause|laughs?|inaudible|blank_audio)[^)]*\\)",
+        var s = text.replacingOccurrences(of: "\\[[^\\]]*\\]|\\((?:music|silence|applause|laughs?|inaudible|blank_audio|(?:speaking in )?(?:a )?foreign language)[^)]*\\)",
                                           with: "", options: [.regularExpression, .caseInsensitive])
         s = s.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
